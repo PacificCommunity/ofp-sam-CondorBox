@@ -1,5 +1,5 @@
 
-generate_and_run_bash <- function(
+submit_github_condor_job <- function(
     remote_user,      # Remote server username
     remote_host,      # Remote server address
     remote_dir,       # Remote working directory
@@ -8,12 +8,31 @@ generate_and_run_bash <- function(
     github_org,       # GitHub organization name
     github_repo,      # GitHub repository name
     docker_image,     # Docker image to use
-    target_folder = NULL # Optional: specific folder within the repository
+    target_folder = NULL,   # Optional: folder within the repository for sparse checkout & make execution
+    archive_folder = NULL   # Optional: folder (relative to repository root or target_folder) to archive as output
 ) {
   # 1. Fixed file name for the Bash script
-  bash_script <- "run_job.sh"  # Fixed name for the bash script
+  bash_script <- "run_job.sh"  # Fixed name for the Bash script
   
-  # Create the Bash script content
+  # Create optional export for TARGET_FOLDER if provided
+  target_export <- if (!is.null(target_folder)) {
+    sprintf("export GITHUB_TARGET_FOLDER='%s'", target_folder)
+  } else {
+    ""
+  }
+  
+  # Create optional export for ARCHIVE_FOLDER if provided
+  archive_export <- if (!is.null(archive_folder)) {
+    sprintf("export ARCHIVE_FOLDER='%s'", archive_folder)
+  } else {
+    ""
+  }
+  
+  # Create the Bash script content.
+  # Always clone the entire repository. If GITHUB_TARGET_FOLDER is set, use sparse checkout.
+  # For make execution, change into GITHUB_TARGET_FOLDER if set; otherwise use GITHUB_REPO.
+  # When archiving, if ARCHIVE_FOLDER is set, archive that; if not and GITHUB_TARGET_FOLDER exists, archive that;
+  # otherwise, archive the entire repository.
   cat(sprintf("
 #!/bin/bash
 
@@ -22,6 +41,7 @@ export GITHUB_PAT='%s'
 export GITHUB_USERNAME='%s'
 export GITHUB_ORGANIZATION='%s'
 export GITHUB_REPO='%s'
+%s
 %s
 
 # Clone the repository or, if GITHUB_TARGET_FOLDER is set, perform a sparse checkout.
@@ -37,7 +57,7 @@ else
     git clone https://$GITHUB_USERNAME:$GITHUB_PAT@github.com/$GITHUB_ORGANIZATION/$GITHUB_REPO.git
 fi
 
-# Change into the appropriate directory and run make
+# Change into the appropriate directory for make execution.
 if [[ -n \"$GITHUB_TARGET_FOLDER\" ]]; then
     cd \"$GITHUB_TARGET_FOLDER\" || exit 1
 else
@@ -46,11 +66,16 @@ fi
 echo \"Running make...\"
 make
 
-# Go back to the parent directory
+# Go back to the parent directory (repository root)
 cd ..
 
-# Determine which folder to archive: if a target folder is specified, archive it; otherwise archive the entire repository.
-if [[ -n \"$GITHUB_TARGET_FOLDER\" ]]; then
+# Determine which folder to archive:
+# If ARCHIVE_FOLDER is set, archive that;
+# Else if GITHUB_TARGET_FOLDER is set, archive that;
+# Otherwise, archive the entire repository.
+if [[ -n \"$ARCHIVE_FOLDER\" ]]; then
+    archive_folder=\"$ARCHIVE_FOLDER\"
+elif [[ -n \"$GITHUB_TARGET_FOLDER\" ]]; then
     archive_folder=\"$GITHUB_TARGET_FOLDER\"
 else
     archive_folder=\"$GITHUB_REPO\"
@@ -63,7 +88,7 @@ tar -czvf output_archive.tar.gz \"$archive_folder\"
 unset GITHUB_PAT
 ", 
               github_pat, github_username, github_org, github_repo,
-              if (!is.null(target_folder)) sprintf("export GITHUB_TARGET_FOLDER='%s'", target_folder) else ""), 
+              target_export, archive_export), 
       file = bash_script)
   
   # 2. Create the HTCondor submit file content
@@ -100,4 +125,3 @@ Queue
   
   message("Condor job submitted successfully!")
 }
-
