@@ -1,0 +1,10 @@
+Package: docker4mfcl
+Title: Docker Setup Utilities for Running MFCL
+Version: 0.1.0
+Authors@R: person("Kyuhan", "Kim", email = "kyuhank@spc.int", role = c("aut", "cre"))
+Description: A collection of functions to setup a Docker image to run MFCL on non-Linux machines.
+License: MIT
+Encoding: UTF-8
+LazyData: true
+Depends: R (>= 4.2.3)
+RoxygenNote: 7.3.2
