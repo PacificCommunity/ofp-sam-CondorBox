@@ -49,10 +49,7 @@ To use **CondorBox**, ensure the following dependencies are installed and config
    - Required to execute UNIX-style shell commands on Windows.  
    - Install Git from [https://git-scm.com/downloads](https://git-scm.com/downloads).
 
-4. **HTCondor** (on the remote cluster)  
-   - Ensure HTCondor is installed and properly configured on the remote cluster.
-
-5. **SSH Access**  
+4. **SSH Access**  
    - SSH should be set up for secure communication with the remote server.  
    - Test connectivity:  
      ```bash
@@ -88,5 +85,7 @@ To access private GitHub repositories or to authenticate securely, you need a **
 ### Using the GitHub PAT with CondorBox
 
 - Save your GitHub PAT as an environment variable to avoid hardcoding it into scripts:
-  ```bash
-  export GITHUB_PAT="your_generated_token"
+  ```r
+  Sys.setenv(GitPass = "your_github_pat")
+  ```
+- Use the `Sys.getenv("GitPass")` function to access the GitHub PAT in your scripts.
