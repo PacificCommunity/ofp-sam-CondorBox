@@ -59,7 +59,7 @@ CondorBox <- function(
   clone_script <- "clone_job.sh"
   run_script <- "run_job.sh"
   
-  # 1. Create the clone_job.sh script
+  # Create the clone_job.sh script
   cat(sprintf("
 #!/bin/bash
 export GITHUB_PAT='%s'
@@ -82,32 +82,25 @@ fi
               if (!is.null(target_folder)) sprintf("export GITHUB_TARGET_FOLDER='%s'", target_folder) else ""),
       file = clone_script)
   
-  # 2. Create the run_job.sh script
+  # Create the run_job.sh script
   cat(sprintf("
 #!/bin/bash
 
-# Source the clone script to perform the git clone
 source %s
 
-# Save the working directory
 if [[ -n \"$GITHUB_TARGET_FOLDER\" ]]; then
     WORK_DIR=\"$GITHUB_TARGET_FOLDER\"
 else
     WORK_DIR=\"$GITHUB_REPO\"
 fi
 
-# Delete the clone script after sourcing it
 rm -f %s
-
-# Unset the GitHub PAT
 unset GITHUB_PAT
 
-# Change into the working directory and run make
 cd \"$WORK_DIR\" || exit 1
 echo \"Running make...\"
 make
 
-# Archive the directory
 cd ..
 echo \"Archiving folder: $WORK_DIR...\"
 tar -czvf output_archive.tar.gz \"$WORK_DIR\"
@@ -115,7 +108,7 @@ tar -czvf output_archive.tar.gz \"$WORK_DIR\"
               clone_script, clone_script),
       file = run_script)
   
-  # 3. Create the Condor submit file
+  # Create the Condor submit file
   condor_options <- c()
   if (!is.null(condor_cpus)) {
     condor_options <- c(condor_options, sprintf("request_cpus = %s", condor_cpus))
@@ -137,28 +130,26 @@ TransferOutputFiles = output_archive.tar.gz
 Output     = condor_job.out
 Error      = condor_job.err
 Log        = condor_job.log
+environment = IS_CONDOR_RUN=true
 %s
 Queue
 ", 
               docker_image, run_script, clone_script, run_script, condor_options),
       file = submit_file)
   
-  # 4. Check if the remote directory exists
+  # Check if the remote directory exists
   message("Checking if the remote directory exists...")
   system(sprintf("ssh %s@%s 'mkdir -p %s'", remote_user, remote_host, remote_dir))
   
-  # 5. Transfer scripts and submit file to remote server
-  message("Transferring the scripts and submit file to the remote server...")
+  # Transfer scripts and submit file to remote server
+  message("Transferring scripts and submit file...")
   system(sprintf("scp %s %s@%s:%s/%s", clone_script, remote_user, remote_host, remote_dir, clone_script))
   system(sprintf("scp %s %s@%s:%s/%s", run_script, remote_user, remote_host, remote_dir, run_script))
   system(sprintf("scp %s %s@%s:%s/%s", submit_file, remote_user, remote_host, remote_dir, submit_file))
   
-  # Introduce a delay to ensure the files are written and accessible
-  message("Waiting briefly to ensure file transfer completion...")
-  Sys.sleep(5)  # Wait for 5 seconds
+  Sys.sleep(5)
   
-  # 6. Submit the Condor job on the remote server
-  message("Submitting the Condor job on the remote server...")
+  # Submit the Condor job
   tryCatch({
     system(sprintf("ssh %s@%s 'cd %s && condor_submit %s'", remote_user, remote_host, remote_dir, submit_file))
     message("Condor job submitted successfully!")
@@ -166,11 +157,11 @@ Queue
     message("Condor submission failed: ", e$message)
   })
   
-  # 7. Delete clone_job.sh from the remote server regardless of submission success
+  # Delete clone_job.sh from the remote server
   message("Deleting clone_job.sh from the remote server...")
   system(sprintf("ssh %s@%s 'rm -f %s/%s'", remote_user, remote_host, remote_dir, clone_script))
   
-  # 8. Clean up local files
+  # Clean up local files
   unlink(c(clone_script, run_script, submit_file))
   
   message("Cleanup completed.")
