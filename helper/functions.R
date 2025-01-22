@@ -76,7 +76,7 @@ cd ..
 if [[ -n \"$ARCHIVE_FOLDER\" ]]; then
     archive_folder=\"$ARCHIVE_FOLDER\"
 elif [[ -n \"$GITHUB_TARGET_FOLDER\" ]]; then
-    archive_folder=\"$GITHUB_TARGET_FOLDER\"
+    archive_folder=\"$GITHUB_TARGET_FOLDER/$ARCHIVE_FOLDER\"
 else
     archive_folder=\"$GITHUB_REPO\"
 fi
