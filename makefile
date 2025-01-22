@@ -1,4 +1,4 @@
 # Makefile
 
 all:
-	Rscript test_script.R
+	Rscript test_r/test_script.R
