@@ -55,12 +55,24 @@ CondorBox <- function(
     condor_cpus = NULL,
     condor_memory = NULL
 ) {
+  # Helper function to normalize paths for Windows
+  normalize_path <- function(path) {
+    if (.Platform$OS.type == "windows") {
+      normalizePath(path, winslash = "/", mustWork = FALSE)
+    } else {
+      path
+    }
+  }
+  
   # Define file names
   clone_script <- "clone_job.sh"
   run_script <- "run_job.sh"
   
+  # Ensure paths are Windows-compatible
+  remote_dir <- normalize_path(remote_dir)
+  
   # 1. Create the clone_job.sh script
-  cat(sprintf("
+  clone_script_content <- sprintf("
 #!/bin/bash
 export GITHUB_PAT='%s'
 export GITHUB_USERNAME='%s'
@@ -78,12 +90,14 @@ else
     git clone https://$GITHUB_USERNAME:$GITHUB_PAT@github.com/$GITHUB_ORGANIZATION/$GITHUB_REPO.git
 fi
 ", 
-              github_pat, github_username, github_org, github_repo,
-              if (!is.null(target_folder)) sprintf("export GITHUB_TARGET_FOLDER='%s'", target_folder) else ""),
-      file = clone_script)
+                                  github_pat, github_username, github_org, github_repo,
+                                  if (!is.null(target_folder)) sprintf("export GITHUB_TARGET_FOLDER='%s'", target_folder) else "")
+  
+  # Write the clone script with LF endings
+  writeLines(clone_script_content, con = clone_script, sep = "\n")
   
   # 2. Create the run_job.sh script
-  cat(sprintf("
+  run_script_content <- sprintf("
 #!/bin/bash
 
 # Source the clone script to perform the git clone
@@ -112,8 +126,10 @@ cd ..
 echo \"Archiving folder: $WORK_DIR...\"
 tar -czvf output_archive.tar.gz \"$WORK_DIR\"
 ", 
-              clone_script, clone_script),
-      file = run_script)
+                                clone_script, clone_script)
+  
+  # Write the run script with LF endings
+  writeLines(run_script_content, con = run_script, sep = "\n")
   
   # 3. Create the Condor submit file
   condor_options <- c()
@@ -126,7 +142,7 @@ tar -czvf output_archive.tar.gz \"$WORK_DIR\"
   condor_options <- paste(condor_options, collapse = "\n")
   
   submit_file <- "condor_job.submit"
-  cat(sprintf("
+  submit_file_content <- sprintf("
 Universe   = docker
 DockerImage = %s
 Executable = /bin/bash
@@ -141,8 +157,9 @@ environment = IS_CONDOR_RUN=true
 %s
 Queue
 ", 
-              docker_image, run_script, clone_script, run_script, condor_options),
-      file = submit_file)
+                                 docker_image, run_script, clone_script, run_script, condor_options)
+  
+  writeLines(submit_file_content, con = submit_file, sep = "\n")
   
   # 4. Check if the remote directory exists
   message("Checking if the remote directory exists...")
@@ -176,3 +193,4 @@ Queue
   
   message("Cleanup completed.")
 }
+
