@@ -1,12 +1,12 @@
-#' Run Job via HTCondor and Docker with Separate Clone and Run Scripts
+#' Run Job via HTCondor and Docker with Make Options
 #'
 #' This function creates two Bash script files. The first script, \code{clone_job.sh},
 #' handles cloning a GitHub repository (or a specific folder via sparse checkout) using the provided
 #' GitHub Personal Access Token (PAT). The second script, \code{run_job.sh}, sources the clone script
 #' to perform the clone, stores the working directory in a variable, schedules the deletion of the clone
 #' script (to remove sensitive PAT information from disk), and then executes the remaining commands
-#' (running \code{make} and archiving the appropriate folder). An HTCondor submit file is also generated
-#' and transferred to a remote server for job submission.
+#' (running \code{make} with user-defined options and archiving the appropriate folder). An HTCondor submit
+#' file is also generated and transferred to a remote server for job submission.
 #'
 #' @param remote_user Character. Remote server username.
 #' @param remote_host Character. Remote server address.
@@ -20,26 +20,10 @@
 #'   and where \code{make} is executed. If not provided, the entire repository is used.
 #' @param condor_cpus Numeric, optional. The number of CPUs to request in the HTCondor job.
 #' @param condor_memory Character, optional. The amount of memory to request (e.g., "4GB") in the HTCondor job.
+#' @param make_options Character, optional. Options to pass to the \code{make} command. Defaults to \code{"all"}.
 #'
 #' @return No return value; side effects include the creation and transfer of script files to the remote server
 #'   and submission of an HTCondor job.
-#'
-#' @examples
-#' \dontrun{
-#'   docker_run_condor(
-#'     remote_user = "myuser",
-#'     remote_host = "remote.server.com",
-#'     remote_dir  = "/home/myuser/jobs",
-#'     github_pat = "ghp_xxxxxxxxxxxxxxxxxxxx",
-#'     github_username = "mygithub",
-#'     github_org = "myorg",
-#'     github_repo = "myrepo",
-#'     docker_image = "mydocker/image:latest",
-#'     target_folder = "src",
-#'     condor_cpus = 4,
-#'     condor_memory = "4GB"
-#'   )
-#' }
 #'
 #' @export
 CondorBox <- function(
@@ -53,7 +37,8 @@ CondorBox <- function(
     docker_image,
     target_folder = NULL,
     condor_cpus = NULL,
-    condor_memory = NULL
+    condor_memory = NULL,
+    make_options = "all" # Default make options
 ) {
   # Helper function to normalize paths for Windows
   normalize_path <- function(path) {
@@ -93,7 +78,7 @@ fi
                                   github_pat, github_username, github_org, github_repo,
                                   if (!is.null(target_folder)) sprintf("export GITHUB_TARGET_FOLDER='%s'", target_folder) else "")
   
-  # Write the clone script with LF endings
+  # Write the clone script
   writeLines(clone_script_content, con = clone_script, sep = "\n")
   
   # 2. Create the run_job.sh script
@@ -118,17 +103,17 @@ unset GITHUB_PAT
 
 # Change into the working directory and run make
 cd \"$WORK_DIR\" || exit 1
-echo \"Running make...\"
-make
+echo \"Running make with options: %s\"
+make %s
 
 # Archive the directory
 cd ..
 echo \"Archiving folder: $WORK_DIR...\"
 tar -czvf output_archive.tar.gz \"$WORK_DIR\"
 ", 
-                                clone_script, clone_script)
+                                clone_script, clone_script, make_options, make_options)
   
-  # Write the run script with LF endings
+  # Write the run script
   writeLines(run_script_content, con = run_script, sep = "\n")
   
   # 3. Create the Condor submit file
@@ -193,4 +178,3 @@ Queue
   
   message("Cleanup completed.")
 }
-
