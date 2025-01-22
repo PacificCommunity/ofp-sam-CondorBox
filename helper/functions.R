@@ -8,7 +8,7 @@ generate_and_run_bash <- function(
     github_org,       # GitHub organization name
     github_repo,      # GitHub repository name
     docker_image,     # Docker image to use
-    target_folder = NULL # Optional: specific folder within the repository
+    target_folder = NULL # Optional: specific folder within the repository (ignored for archiving)
 ) {
   # 1. Fixed file name for the Bash script
   bash_script <- "run_job.sh"  # Fixed name for the bash script
@@ -24,30 +24,24 @@ export GITHUB_ORGANIZATION='%s'
 export GITHUB_REPO='%s'
 %s
 
-# Clone the repository or a specific folder
-if [[ -n \"$GITHUB_TARGET_FOLDER\" ]]; then
-    echo \"Cloning specific folder ($GITHUB_TARGET_FOLDER) from the repository...\"
-    git init
-    git remote add origin https://$GITHUB_USERNAME:$GITHUB_PAT@github.com/$GITHUB_ORGANIZATION/$GITHUB_REPO.git
-    git config core.sparseCheckout true
-    echo \"$GITHUB_TARGET_FOLDER/\" >> .git/info/sparse-checkout
-    git pull origin main
-else
-    echo \"Cloning the entire repository...\"
-    git clone https://$GITHUB_USERNAME:$GITHUB_PAT@github.com/$GITHUB_ORGANIZATION/$GITHUB_REPO.git
-fi
+# Clone the entire repository
+echo \"Cloning the entire repository...\"
+git clone https://$GITHUB_USERNAME:$GITHUB_PAT@github.com/$GITHUB_ORGANIZATION/$GITHUB_REPO.git
 
-# Run the make command
+# Change into the repository directory and run make
+cd $GITHUB_REPO || exit 1
 echo \"Running make...\"
 make
 
-# Archive all .RData files
-echo \"Archiving all .RData files...\"
-tar -czvf output_archive.tar.gz *.RData
+# Go back to parent directory and archive the entire repository folder (including outputs)
+cd ..
+echo \"Archiving the entire repository folder...\"
+tar -czvf output_archive.tar.gz \"$GITHUB_REPO\"
 
 # Clean up sensitive information
 unset GITHUB_PAT
-", github_pat, github_username, github_org, github_repo,
+", 
+              github_pat, github_username, github_org, github_repo,
               if (!is.null(target_folder)) sprintf("export GITHUB_TARGET_FOLDER='%s'", target_folder) else ""), 
       file = bash_script)
   
@@ -85,3 +79,4 @@ Queue
   
   message("Condor job submitted successfully!")
 }
+
