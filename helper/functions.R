@@ -8,7 +8,7 @@ generate_and_run_bash <- function(
     github_org,       # GitHub organization name
     github_repo,      # GitHub repository name
     docker_image,     # Docker image to use
-    target_folder = NULL # Optional: specific folder within the repository to archive
+    target_folder = NULL # Optional: specific folder within the repository
 ) {
   # 1. Fixed file name for the Bash script
   bash_script <- "run_job.sh"  # Fixed name for the bash script
@@ -24,29 +24,30 @@ export GITHUB_ORGANIZATION='%s'
 export GITHUB_REPO='%s'
 %s
 
-# Clone the entire repository
-echo \"Cloning the entire repository...\"
-git clone https://$GITHUB_USERNAME:$GITHUB_PAT@github.com/$GITHUB_ORGANIZATION/$GITHUB_REPO.git
+# Clone the repository or a specific folder
+if [[ -n \"$GITHUB_TARGET_FOLDER\" ]]; then
+    echo \"Cloning specific folder ($GITHUB_TARGET_FOLDER) from the repository...\"
+    git init
+    git remote add origin https://$GITHUB_USERNAME:$GITHUB_PAT@github.com/$GITHUB_ORGANIZATION/$GITHUB_REPO.git
+    git config core.sparseCheckout true
+    echo \"$GITHUB_TARGET_FOLDER/\" >> .git/info/sparse-checkout
+    git pull origin main
+else
+    echo \"Cloning the entire repository...\"
+    git clone https://$GITHUB_USERNAME:$GITHUB_PAT@github.com/$GITHUB_ORGANIZATION/$GITHUB_REPO.git
+fi
 
 # Run the make command
 echo \"Running make...\"
 make
 
-# Determine which folder to archive: 
-# if GITHUB_TARGET_FOLDER is specified, archive that folder within the repository;
-# otherwise, archive the entire repository folder.
-if [[ -n \"$GITHUB_TARGET_FOLDER\" ]]; then
-    archive_folder=\"$GITHUB_REPO/$GITHUB_TARGET_FOLDER\"
-else
-    archive_folder=\"$GITHUB_REPO\"
-fi
-echo \"Archiving folder: $archive_folder...\"
-tar -czvf output_archive.tar.gz \"$archive_folder\"
+# Archive all .RData files
+echo \"Archiving all .RData files...\"
+tar -czvf output_archive.tar.gz *.RData
 
 # Clean up sensitive information
 unset GITHUB_PAT
-", 
-              github_pat, github_username, github_org, github_repo,
+", github_pat, github_username, github_org, github_repo,
               if (!is.null(target_folder)) sprintf("export GITHUB_TARGET_FOLDER='%s'", target_folder) else ""), 
       file = bash_script)
   
