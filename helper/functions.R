@@ -8,7 +8,7 @@ generate_and_run_bash <- function(
     github_org,       # GitHub organization name
     github_repo,      # GitHub repository name
     docker_image,     # Docker image to use
-    target_folder = NULL # Optional: specific folder within the repository (ignored for archiving)
+    target_folder = NULL # Optional: specific folder within the repository
 ) {
   # 1. Fixed file name for the Bash script
   bash_script <- "run_job.sh"  # Fixed name for the bash script
@@ -24,19 +24,36 @@ export GITHUB_ORGANIZATION='%s'
 export GITHUB_REPO='%s'
 %s
 
-# Clone the entire repository
-echo \"Cloning the entire repository...\"
-git clone https://$GITHUB_USERNAME:$GITHUB_PAT@github.com/$GITHUB_ORGANIZATION/$GITHUB_REPO.git
+# Clone the repository or, if GITHUB_TARGET_FOLDER is set, perform a sparse checkout.
+if [[ -n \"$GITHUB_TARGET_FOLDER\" ]]; then
+    echo \"Cloning specific folder ($GITHUB_TARGET_FOLDER) from the repository...\"
+    git init
+    git remote add origin https://$GITHUB_USERNAME:$GITHUB_PAT@github.com/$GITHUB_ORGANIZATION/$GITHUB_REPO.git
+    git config core.sparseCheckout true
+    echo \"$GITHUB_TARGET_FOLDER/\" >> .git/info/sparse-checkout
+    git pull origin main
+else
+    echo \"Cloning the entire repository...\"
+    git clone https://$GITHUB_USERNAME:$GITHUB_PAT@github.com/$GITHUB_ORGANIZATION/$GITHUB_REPO.git
+fi
 
 # Change into the repository directory and run make
 cd $GITHUB_REPO || exit 1
 echo \"Running make...\"
 make
 
-# Go back to parent directory and archive the entire repository folder (including outputs)
+# Go back to the parent directory
 cd ..
-echo \"Archiving the entire repository folder...\"
-tar -czvf output_archive.tar.gz \"$GITHUB_REPO\"
+
+# Determine which folder to archive: if a target folder is specified, archive it; otherwise archive the entire repository.
+if [[ -n \"$GITHUB_TARGET_FOLDER\" ]]; then
+    archive_folder=\"$GITHUB_TARGET_FOLDER\"
+else
+    archive_folder=\"$GITHUB_REPO\"
+fi
+
+echo \"Archiving folder: $archive_folder...\"
+tar -czvf output_archive.tar.gz \"$archive_folder\"
 
 # Clean up sensitive information
 unset GITHUB_PAT
@@ -79,4 +96,3 @@ Queue
   
   message("Condor job submitted successfully!")
 }
-
