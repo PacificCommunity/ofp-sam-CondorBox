@@ -37,8 +37,12 @@ else
     git clone https://$GITHUB_USERNAME:$GITHUB_PAT@github.com/$GITHUB_ORGANIZATION/$GITHUB_REPO.git
 fi
 
-# Change into the repository directory and run make
-cd $GITHUB_REPO || exit 1
+# Change into the appropriate directory and run make
+if [[ -n \"$GITHUB_TARGET_FOLDER\" ]]; then
+    cd \"$GITHUB_TARGET_FOLDER\" || exit 1
+else
+    cd \"$GITHUB_REPO\" || exit 1
+fi
 echo \"Running make...\"
 make
 
@@ -96,3 +100,4 @@ Queue
   
   message("Condor job submitted successfully!")
 }
+
