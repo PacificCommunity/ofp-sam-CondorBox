@@ -16,7 +16,6 @@ manage_rstudio_server <- function(
     host_port = 8787,
     container_port = 8787
 ) {
-  # Detect Docker or Podman
   cli <- if (tryCatch(
     grepl("podman", system("docker --version", intern = TRUE, ignore.stderr = TRUE)),
     error = function(e) FALSE
@@ -27,21 +26,10 @@ manage_rstudio_server <- function(
   }
   message(sprintf("Using CLI: %s", cli))
   
-  # Check Docker/Podman is running
-  docker_running <- tryCatch({
-    system(sprintf("%s info", cli), intern = TRUE, ignore.stderr = TRUE)
-    TRUE
-  }, error = function(e) FALSE, warning = function(w) FALSE)
-  
-  if (!docker_running) {
-    stop("Docker or Podman is not running. Please start the service and try again.")
-  }
-  
   action <- match.arg(action)
   
   tryCatch({
     if (action == "start") {
-      # List existing containers
       list_cmd <- sprintf("%s ps -a --format '{{.Names}}'", cli)
       existing_containers <- system(list_cmd, intern = TRUE, ignore.stderr = TRUE)
       
@@ -52,7 +40,7 @@ manage_rstudio_server <- function(
       } else {
         message("Container not found. Creating a new one...")
         docker_cmd <- sprintf(
-          "%s run -d -p %d:%d --name %s -e RSERVER_USE=1 -e RSTUDIO_PORT=%d %s",
+          "%s run -d -p %d:%d --name %s -e RSTUDIO_PORT=%d %s",
           cli, host_port, container_port, container_name, container_port, image
         )
         system(docker_cmd)
