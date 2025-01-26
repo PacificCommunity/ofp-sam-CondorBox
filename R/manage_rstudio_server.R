@@ -16,6 +16,7 @@ manage_rstudio_server <- function(
     host_port = 8787,
     container_port = 8787
 ) {
+  # Determine whether to use Docker or Podman
   cli <- if (tryCatch(
     grepl("podman", system("docker --version", intern = TRUE, ignore.stderr = TRUE)),
     error = function(e) FALSE
@@ -24,26 +25,54 @@ manage_rstudio_server <- function(
   } else {
     "docker"
   }
-  message(sprintf("Using CLI: %s", cli))
   
+  message(sprintf("Using CLI: %s", cli))
   action <- match.arg(action)
+  
+  # --- Function to check and stop local rserver if needed ---
+  free_port_if_rserver_running <- function(port) {
+    # Check if 'rserver' is listening on the specified port
+    check_cmd <- sprintf("netstat -tulpn 2>/dev/null | grep ':%d ' | grep rserver", port)
+    netstat_output <- system(check_cmd, intern = TRUE)
+    
+    if (length(netstat_output) > 0) {
+      message(sprintf(
+        "Detected 'rserver' using port %d. Attempting to stop local rserver...",
+        port
+      ))
+      # Stopping rserver typically requires sudo privileges
+      stop_cmd <- "sudo rstudio-server stop"
+      system(stop_cmd, ignore.stdout = TRUE, ignore.stderr = TRUE)
+      
+      # Check again to confirm it stopped
+      netstat_output_after <- system(check_cmd, intern = TRUE)
+      if (length(netstat_output_after) == 0) {
+        message("Local rserver was successfully stopped.\n")
+      } else {
+        message("Warning: rserver still appears to be running.\n")
+      }
+    }
+  }
   
   tryCatch({
     if (action == "start") {
-      # Check if the image exists locally
+      # 1) Check & free up the port if rserver is running
+      free_port_if_rserver_running(host_port)
+      
+      # 2) Check if the image exists locally
       image_check_cmd <- sprintf("%s images -q %s", cli, image)
       image_id <- system(image_check_cmd, intern = TRUE, ignore.stderr = TRUE)
       
       if (length(image_id) == 0 || nchar(image_id) == 0) {
         message(sprintf("Image '%s' not found locally. Pulling from registry...", image))
         pull_cmd <- sprintf("%s pull %s", cli, image)
-        pull_status <- system(pull_cmd, intern = TRUE, ignore.stderr = TRUE)
+        system(pull_cmd, intern = TRUE, ignore.stderr = TRUE)
         message("Image pulled successfully.")
       } else {
         message(sprintf("Image '%s' found locally.", image))
       }
       
-      # List existing containers
+      # 3) Start or create the container
       list_cmd <- sprintf("%s ps -a --format '{{.Names}}'", cli)
       existing_containers <- system(list_cmd, intern = TRUE, ignore.stderr = TRUE)
       
@@ -67,15 +96,19 @@ manage_rstudio_server <- function(
       try({
         browseURL(url)
       }, silent = TRUE)
+      
     } else if (action == "stop") {
+      # Stop the container
       stop_cmd <- sprintf("%s stop %s", cli, container_name)
       message("Stopping the container...")
       system(stop_cmd, ignore.stderr = TRUE)
       message(sprintf("Container '%s' has been stopped.", container_name))
     }
-  }, interrupt = function(e) {
+  },
+  interrupt = function(e) {
     message("\nProcess interrupted by the user.")
-  }, error = function(e) {
+  },
+  error = function(e) {
     message("\nAn error occurred: ", e$message)
   })
 }
