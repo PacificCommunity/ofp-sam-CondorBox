@@ -40,7 +40,7 @@ manage_rstudio_server <- function(
       } else {
         message("Container not found. Creating a new one...")
         docker_cmd <- sprintf(
-          "%s run -d -p %d:%d --name %s -e RSTUDIO_SERVER=1 -e RSTUDIO_PORT=%d %s",
+          "%s run -d -p %d:%d --name %s -e RSTUDIO_PORT=%d %s",
           cli, host_port, container_port, container_name, container_port, image
         )
         system(docker_cmd)
@@ -65,4 +65,3 @@ manage_rstudio_server <- function(
     message("\nAn error occurred: ", e$message)
   })
 }
-
