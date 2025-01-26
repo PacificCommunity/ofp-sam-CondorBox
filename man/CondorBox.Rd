@@ -2,7 +2,7 @@
 % Please edit documentation in R/CondorBox.R
 \name{CondorBox}
 \alias{CondorBox}
-\title{Run Job via HTCondor and Docker with Separate Clone and Run Scripts}
+\title{Run Job via HTCondor and Docker with Make Options}
 \usage{
 CondorBox(
   remote_user,
@@ -15,7 +15,8 @@ CondorBox(
   docker_image,
   target_folder = NULL,
   condor_cpus = NULL,
-  condor_memory = NULL
+  condor_memory = NULL,
+  make_options = "all"
 )
 }
 \arguments{
@@ -41,6 +42,8 @@ and where \code{make} is executed. If not provided, the entire repository is use
 \item{condor_cpus}{Numeric, optional. The number of CPUs to request in the HTCondor job.}
 
 \item{condor_memory}{Character, optional. The amount of memory to request (e.g., "4GB") in the HTCondor job.}
+
+\item{make_options}{Character, optional. Options to pass to the \code{make} command. Defaults to \code{"all"}.}
 }
 \value{
 No return value; side effects include the creation and transfer of script files to the remote server
@@ -52,24 +55,6 @@ handles cloning a GitHub repository (or a specific folder via sparse checkout) u
 GitHub Personal Access Token (PAT). The second script, \code{run_job.sh}, sources the clone script
 to perform the clone, stores the working directory in a variable, schedules the deletion of the clone
 script (to remove sensitive PAT information from disk), and then executes the remaining commands
-(running \code{make} and archiving the appropriate folder). An HTCondor submit file is also generated
-and transferred to a remote server for job submission.
-}
-\examples{
-\dontrun{
-  docker_run_condor(
-    remote_user = "myuser",
-    remote_host = "remote.server.com",
-    remote_dir  = "/home/myuser/jobs",
-    github_pat = "ghp_xxxxxxxxxxxxxxxxxxxx",
-    github_username = "mygithub",
-    github_org = "myorg",
-    github_repo = "myrepo",
-    docker_image = "mydocker/image:latest",
-    target_folder = "src",
-    condor_cpus = 4,
-    condor_memory = "4GB"
-  )
-}
-
+(running \code{make} with user-defined options and archiving the appropriate folder). An HTCondor submit
+file is also generated and transferred to a remote server for job submission.
 }

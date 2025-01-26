@@ -2,3 +2,5 @@
 
 export(CondorBox)
 export(CondorUnbox)
+export(clean_docker_resources_interactive)
+export(manage_rstudio_server)
