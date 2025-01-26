@@ -30,6 +30,20 @@ manage_rstudio_server <- function(
   
   tryCatch({
     if (action == "start") {
+      # Check if the image exists locally
+      image_check_cmd <- sprintf("%s images -q %s", cli, image)
+      image_id <- system(image_check_cmd, intern = TRUE, ignore.stderr = TRUE)
+      
+      if (length(image_id) == 0 || nchar(image_id) == 0) {
+        message(sprintf("Image '%s' not found locally. Pulling from registry...", image))
+        pull_cmd <- sprintf("%s pull %s", cli, image)
+        pull_status <- system(pull_cmd, intern = TRUE, ignore.stderr = TRUE)
+        message("Image pulled successfully.")
+      } else {
+        message(sprintf("Image '%s' found locally.", image))
+      }
+      
+      # List existing containers
       list_cmd <- sprintf("%s ps -a --format '{{.Names}}'", cli)
       existing_containers <- system(list_cmd, intern = TRUE, ignore.stderr = TRUE)
       
@@ -65,3 +79,4 @@ manage_rstudio_server <- function(
     message("\nAn error occurred: ", e$message)
   })
 }
+
