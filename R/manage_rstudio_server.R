@@ -31,9 +31,11 @@ manage_rstudio_server <- function(
   
   # --- Function to check and stop local rserver if needed ---
   free_port_if_rserver_running <- function(port) {
-    # Check if 'rserver' is listening on the specified port
-    check_cmd <- sprintf("netstat -tulpn 2>/dev/null | grep ':%d ' | grep rserver", port)
-    netstat_output <- system(check_cmd, intern = TRUE)
+    # Using '|| true' so it won't emit a non-zero exit code or warnings if grep returns no matches
+    check_cmd <- sprintf("netstat -tulpn 2>/dev/null | grep ':%d ' | grep rserver || true", port)
+    
+    # Capture netstat output silently (no warning if exit code ≠ 0)
+    netstat_output <- system(check_cmd, intern = TRUE, ignore.stderr = TRUE)
     
     if (length(netstat_output) > 0) {
       message(sprintf(
@@ -45,12 +47,14 @@ manage_rstudio_server <- function(
       system(stop_cmd, ignore.stdout = TRUE, ignore.stderr = TRUE)
       
       # Check again to confirm it stopped
-      netstat_output_after <- system(check_cmd, intern = TRUE)
+      netstat_output_after <- system(check_cmd, intern = TRUE, ignore.stderr = TRUE)
       if (length(netstat_output_after) == 0) {
         message("Local rserver was successfully stopped.\n")
       } else {
         message("Warning: rserver still appears to be running.\n")
       }
+    } else {
+      message(sprintf("No local rserver found on port %d. Port is already free.\n", port))
     }
   }
   
@@ -112,4 +116,3 @@ manage_rstudio_server <- function(
     message("\nAn error occurred: ", e$message)
   })
 }
-
