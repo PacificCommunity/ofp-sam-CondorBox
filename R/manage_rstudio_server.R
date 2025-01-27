@@ -10,7 +10,6 @@
 #' @param container_port The port inside the container. Default is 8787.
 #' @export
 
-
 manage_rstudio_server <- function(
     action = c("start", "stop"),
     image = "rocker/rstudio",
@@ -33,22 +32,16 @@ manage_rstudio_server <- function(
   
   # --- Function to check and stop local rserver if needed ---
   free_port_if_rserver_running <- function(port) {
-    # Using '|| true' so it won't emit a non-zero exit code or warnings if grep returns no matches
     check_cmd <- sprintf("netstat -tulpn 2>/dev/null | grep ':%d ' | grep rserver || true", port)
-    
-    # Capture netstat output silently (no warning if exit code ≠ 0)
     netstat_output <- system(check_cmd, intern = TRUE, ignore.stderr = TRUE)
-    
     if (length(netstat_output) > 0) {
       message(sprintf(
         "Detected 'rserver' using port %d. Attempting to stop local rserver...",
         port
       ))
-      # Stopping rserver typically requires sudo privileges
       stop_cmd <- "sudo rstudio-server stop"
       system(stop_cmd, ignore.stdout = TRUE, ignore.stderr = TRUE)
       
-      # Check again to confirm it stopped
       netstat_output_after <- system(check_cmd, intern = TRUE, ignore.stderr = TRUE)
       if (length(netstat_output_after) == 0) {
         message("Local rserver was successfully stopped.\n")
@@ -62,10 +55,8 @@ manage_rstudio_server <- function(
   
   tryCatch({
     if (action == "start") {
-      # 1) Check & free up the port if rserver is running
       free_port_if_rserver_running(host_port)
       
-      # 2) Check if the image exists locally
       image_check_cmd <- sprintf("%s images -q %s", cli, image)
       image_id <- system(image_check_cmd, intern = TRUE, ignore.stderr = TRUE)
       
@@ -78,7 +69,6 @@ manage_rstudio_server <- function(
         message(sprintf("Image '%s' found locally.", image))
       }
       
-      # 3) Start or create the container
       list_cmd <- sprintf("%s ps -a --format '{{.Names}}'", cli)
       existing_containers <- system(list_cmd, intern = TRUE, ignore.stderr = TRUE)
       
@@ -89,7 +79,7 @@ manage_rstudio_server <- function(
       } else {
         message("Container not found. Creating a new one...")
         docker_cmd <- sprintf(
-          "%s run -d --network host --name %s -e RSTUDIO_PORT=%d %s",
+          "%s run -d --network host --name %s -e RSTUDIO_PORT=%d -e RSERVER_USE=1 %s",
           cli, container_name, container_port, image
         )
         system(docker_cmd)
@@ -104,7 +94,6 @@ manage_rstudio_server <- function(
       }, silent = TRUE)
       
     } else if (action == "stop") {
-      # Stop the container
       stop_cmd <- sprintf("%s stop %s", cli, container_name)
       message("Stopping the container...")
       system(stop_cmd, ignore.stderr = TRUE)
@@ -118,3 +107,4 @@ manage_rstudio_server <- function(
     message("\nAn error occurred: ", e$message)
   })
 }
+
