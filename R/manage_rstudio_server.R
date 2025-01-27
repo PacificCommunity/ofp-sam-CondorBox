@@ -12,101 +12,61 @@
 
 manage_rstudio_server <- function(
     action = c("start", "stop"),
-    image = "rocker/rstudio",
-    container_name = "rstudio",
-    host_port = 8888,          # Changed default host port to 8888 to avoid conflicts
+    image = "kyuhank/skj2025:2.0.3",  # Use your custom image
+    container_name = "rstudio33",
+    host_port = 9999,                  # Set desired host port
     container_port = 8787,
-    password = "yourpassword"  # New parameter for setting the password
+    password = "yourpassword"          # Set your desired password
 ) {
-  # Determine whether to use Docker or Podman
-  cli <- if (tryCatch(
-    grepl("podman", system("podman --version", intern = TRUE, ignore.stderr = TRUE)),
-    error = function(e) FALSE
-  )) {
-    "podman"
-  } else {
-    "docker"
-  }
-  
-  message(sprintf("Using CLI: %s", cli))
   action <- match.arg(action)
   
-  # --- Function to check and stop local rserver if needed ---
-  free_port_if_rserver_running <- function(port) {
-    check_cmd <- sprintf("netstat -tulpn 2>/dev/null | grep ':%d ' | grep rserver || true", port)
-    netstat_output <- system(check_cmd, intern = TRUE, ignore.stderr = TRUE)
-    if (length(netstat_output) > 0) {
-      message(sprintf(
-        "Detected 'rserver' using port %d. Attempting to stop local rserver...",
-        port
-      ))
-      stop_cmd <- "sudo systemctl stop rstudio-server"
-      system(stop_cmd, ignore.stdout = TRUE, ignore.stderr = TRUE)
-      
-      netstat_output_after <- system(check_cmd, intern = TRUE, ignore.stderr = TRUE)
-      if (length(netstat_output_after) == 0) {
-        message("Local rserver was successfully stopped.\n")
-      } else {
-        message("Warning: rserver still appears to be running.\n")
-      }
+  if (action == "start") {
+    # Check if the container already exists
+    existing_containers <- system(sprintf("docker ps -a --filter name=%s --format '{{.Names}}'", container_name), intern = TRUE)
+    if (container_name %in% existing_containers) {
+      message(sprintf("Container '%s' already exists. Removing existing container...", container_name))
+      system(sprintf("docker stop %s", container_name), ignore.stderr = TRUE)
+      system(sprintf("docker rm %s", container_name), ignore.stderr = TRUE)
+    }
+    
+    # Run the container with port mapping and password
+    run_cmd <- sprintf("docker run -d -p %d:%d --name %s -e PASSWORD=%s %s", 
+                       host_port, container_port, container_name, password, image)
+    message(sprintf("Running command: %s", run_cmd))
+    system(run_cmd)
+    
+    # Wait briefly to ensure the container starts
+    Sys.sleep(3)
+    
+    # Check if the container is running
+    running <- system(sprintf("docker ps --filter name=%s --filter status=running --format '{{.Names}}'", container_name), intern = TRUE)
+    if (container_name %in% running) {
+      message("RStudio Server is running.")
+      url <- sprintf("http://localhost:%d", host_port)
+      message(sprintf("Access it at: %s", url))
+      try(browseURL(url), silent = TRUE)
     } else {
-      message(sprintf("No local rserver found on port %d. Port is already free.\n", port))
+      message("Failed to start RStudio Server.")
+      # Optionally, display container logs for debugging
+      system(sprintf("docker logs %s", container_name), wait = TRUE)
+    }
+    
+  } else if (action == "stop") {
+    # Stop the container if it's running
+    running <- system(sprintf("docker ps --filter name=%s --filter status=running --format '{{.Names}}'", container_name), intern = TRUE)
+    if (container_name %in% running) {
+      system(sprintf("docker stop %s", container_name))
+      message(sprintf("Container '%s' has been stopped.", container_name))
+    } else {
+      message(sprintf("Container '%s' is not running.", container_name))
+    }
+    
+    # Remove the container if it exists
+    existing_containers <- system(sprintf("docker ps -a --filter name=%s --format '{{.Names}}'", container_name), intern = TRUE)
+    if (container_name %in% existing_containers) {
+      system(sprintf("docker rm %s", container_name))
+      message(sprintf("Container '%s' has been removed.", container_name))
     }
   }
-  
-  tryCatch({
-    if (action == "start") {
-      free_port_if_rserver_running(host_port)
-      
-      # Pull Docker image if not found locally
-      image_check_cmd <- sprintf("%s images -q %s", cli, image)
-      image_id <- system(image_check_cmd, intern = TRUE, ignore.stderr = TRUE)
-      
-      if (length(image_id) == 0 || nchar(image_id) == 0) {
-        message(sprintf("Image '%s' not found locally. Pulling from registry...", image))
-        pull_cmd <- sprintf("%s pull %s", cli, image)
-        system(pull_cmd, ignore.stdout = TRUE, ignore.stderr = TRUE)
-        message("Image pulled successfully.")
-      } else {
-        message(sprintf("Image '%s' found locally.", image))
-      }
-      
-      # Check if container already exists
-      list_cmd <- sprintf("%s ps -a --format '{{.Names}}'", cli)
-      existing_containers <- system(list_cmd, intern = TRUE, ignore.stderr = TRUE)
-      
-      if (container_name %in% existing_containers) {
-        message("Container already exists. Restarting...")
-        restart_cmd <- sprintf("%s start %s", cli, container_name)
-        system(restart_cmd, ignore.stdout = TRUE, ignore.stderr = TRUE)
-      } else {
-        message("Container not found. Creating a new one...")
-        docker_cmd <- sprintf(
-          "%s run -d -p %d:%d --name %s -e PASSWORD=%s %s",
-          cli, host_port, container_port, container_name, password, image
-        )
-        system(docker_cmd, ignore.stdout = TRUE, ignore.stderr = TRUE)
-      }
-      
-      url <- sprintf("http://localhost:%d", host_port)
-      message("\n=== RStudio Server is running ===")
-      message(sprintf("Access it at: %s", url))
-      message("=================================\n")
-      try({
-        browseURL(url)
-      }, silent = TRUE)
-      
-    } else if (action == "stop") {
-      stop_cmd <- sprintf("%s stop %s", cli, container_name)
-      message("Stopping the container...")
-      system(stop_cmd, ignore.stderr = TRUE)
-      message(sprintf("Container '%s' has been stopped.", container_name))
-    }
-  },
-  interrupt = function(e) {
-    message("\nProcess interrupted by the user.")
-  },
-  error = function(e) {
-    message("\nAn error occurred: ", e$message)
-  })
 }
+
