@@ -79,7 +79,7 @@ manage_rstudio_server <- function(
       } else {
         message("Container not found. Creating a new one...")
         docker_cmd <- sprintf(
-          "%s run -d --network host --name %s -e RSTUDIO_PORT=%d -e RSERVER_USE=1 %s",
+          "%s run -d --network host --name %s -e RSTUDIO_PORT=%d -e IS_RSERVER_RUN=1 %s",
           cli, container_name, container_port, image
         )
         system(docker_cmd)
