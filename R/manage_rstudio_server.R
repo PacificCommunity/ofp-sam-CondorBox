@@ -9,6 +9,8 @@
 #' @param host_port The port on the host machine. Default is 8787.
 #' @param container_port The port inside the container. Default is 8787.
 #' @export
+
+
 manage_rstudio_server <- function(
     action = c("start", "stop"),
     image = "rocker/rstudio",
@@ -87,8 +89,8 @@ manage_rstudio_server <- function(
       } else {
         message("Container not found. Creating a new one...")
         docker_cmd <- sprintf(
-          "%s run -d -p %d:%d --name %s -e RSTUDIO_PORT=%d %s",
-          cli, host_port, container_port, container_name, container_port, image
+          "%s run -d --network host --name %s -e RSTUDIO_PORT=%d %s",
+          cli, container_name, container_port, image
         )
         system(docker_cmd)
       }
