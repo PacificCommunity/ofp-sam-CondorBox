@@ -68,12 +68,23 @@ manage_rstudio_server <- function(
     if (container_exists(container_name)) {
       if (container_running(container_name)) {
         message(sprintf("Container '%s' is already running.", container_name))
+        # Open URL in browser since the container is running
+        url <- sprintf("http://localhost:%d", host_port)
+        message(sprintf("Access it at: %s", url))
+        try({
+          browseURL(url)
+        }, silent = TRUE)
       } else {
         start_container(container_name)
         # Optionally, verify if the container started successfully
         Sys.sleep(2)  # Wait a moment for the container to start
         if (container_running(container_name)) {
           message("RStudio Server has been started.")
+          url <- sprintf("http://localhost:%d", host_port)
+          message(sprintf("Access it at: %s", url))
+          try({
+            browseURL(url)
+          }, silent = TRUE)
         } else {
           message("Failed to start RStudio Server. Check container logs for details.")
           system(sprintf("docker logs %s", container_name), wait = TRUE)
