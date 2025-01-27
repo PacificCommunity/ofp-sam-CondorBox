@@ -14,12 +14,13 @@ manage_rstudio_server <- function(
     action = c("start", "stop"),
     image = "rocker/rstudio",
     container_name = "rstudio",
-    host_port = 8787,
-    container_port = 8787
+    host_port = 8888,          # Changed default host port to 8888 to avoid conflicts
+    container_port = 8787,
+    password = "yourpassword"  # New parameter for setting the password
 ) {
   # Determine whether to use Docker or Podman
   cli <- if (tryCatch(
-    grepl("podman", system("docker --version", intern = TRUE, ignore.stderr = TRUE)),
+    grepl("podman", system("podman --version", intern = TRUE, ignore.stderr = TRUE)),
     error = function(e) FALSE
   )) {
     "podman"
@@ -39,7 +40,7 @@ manage_rstudio_server <- function(
         "Detected 'rserver' using port %d. Attempting to stop local rserver...",
         port
       ))
-      stop_cmd <- "sudo rstudio-server stop"
+      stop_cmd <- "sudo systemctl stop rstudio-server"
       system(stop_cmd, ignore.stdout = TRUE, ignore.stderr = TRUE)
       
       netstat_output_after <- system(check_cmd, intern = TRUE, ignore.stderr = TRUE)
@@ -57,32 +58,34 @@ manage_rstudio_server <- function(
     if (action == "start") {
       free_port_if_rserver_running(host_port)
       
+      # Pull Docker image if not found locally
       image_check_cmd <- sprintf("%s images -q %s", cli, image)
       image_id <- system(image_check_cmd, intern = TRUE, ignore.stderr = TRUE)
       
       if (length(image_id) == 0 || nchar(image_id) == 0) {
         message(sprintf("Image '%s' not found locally. Pulling from registry...", image))
         pull_cmd <- sprintf("%s pull %s", cli, image)
-        system(pull_cmd, intern = TRUE, ignore.stderr = TRUE)
+        system(pull_cmd, ignore.stdout = TRUE, ignore.stderr = TRUE)
         message("Image pulled successfully.")
       } else {
         message(sprintf("Image '%s' found locally.", image))
       }
       
+      # Check if container already exists
       list_cmd <- sprintf("%s ps -a --format '{{.Names}}'", cli)
       existing_containers <- system(list_cmd, intern = TRUE, ignore.stderr = TRUE)
       
       if (container_name %in% existing_containers) {
         message("Container already exists. Restarting...")
         restart_cmd <- sprintf("%s start %s", cli, container_name)
-        system(restart_cmd)
+        system(restart_cmd, ignore.stdout = TRUE, ignore.stderr = TRUE)
       } else {
         message("Container not found. Creating a new one...")
         docker_cmd <- sprintf(
-          "%s run -d --network host --name %s -e RSTUDIO_PORT=%d -e IS_RSERVER_RUN=true %s",
-          cli, container_name, container_port, image
+          "%s run -d -p %d:%d --name %s -e PASSWORD=%s %s",
+          cli, host_port, container_port, container_name, password, image
         )
-        system(docker_cmd)
+        system(docker_cmd, ignore.stdout = TRUE, ignore.stderr = TRUE)
       }
       
       url <- sprintf("http://localhost:%d", host_port)
@@ -107,4 +110,3 @@ manage_rstudio_server <- function(
     message("\nAn error occurred: ", e$message)
   })
 }
-
