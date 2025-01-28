@@ -1,15 +1,22 @@
 Package: CondorBox
-Title: Utilities for Synchronising HTCondor Job Outputs with Git Repositories
+Title: Utilities for Synchronising HTCondor Job Outputs with Git
+    Repositories
 Version: 0.1.0
-Authors@R: person("Kyuhan", "Kim", email = "kyuhank@spc.int", role = c("aut", "cre"))
-Description: A collection of functions to manage HTCondor jobs and synchronise their outputs 
-    with local Git repositories. Includes tools for handling remote file transfers, 
-    archive extraction, and file synchronisation with options for overwrite control.
+Authors@R: 
+    person("Kyuhan", "Kim", , "kyuhank@spc.int", role = c("aut", "cre"))
+Description: A collection of functions to manage HTCondor jobs and
+    synchronise their outputs with local Git repositories. Includes tools
+    for handling remote file transfers, archive extraction, and file
+    synchronisation with options for overwrite control.
 License: MIT
-Encoding: UTF-8
-LazyData: true
 Depends: 
     R (>= 4.2.3)
 Imports: 
+    httr,
+    parallel,
+    remotes,
+    rstudioapi,
     utils
+Encoding: UTF-8
+LazyData: true
 RoxygenNote: 7.3.2
