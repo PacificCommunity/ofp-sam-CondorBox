@@ -12,8 +12,8 @@
 
 manage_rstudio_server <- function(
     action = c("start", "stop"),
-    image = "kyuhank/skj2025:2.0.3",  # Use your custom image
-    container_name = "rstudio33",
+    image = "rocker/rstudio",
+    container_name = "rstudio",
     host_port = 9999,                  # Set desired host port
     container_port = 8787,
     password = "yourpassword"          # Set your desired password
