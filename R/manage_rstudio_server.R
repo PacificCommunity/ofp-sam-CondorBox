@@ -20,80 +20,48 @@ manage_rstudio_server <- function(
 ) {
   action <- match.arg(action)
   
-  # Determine the operating system
-  os_type <- .Platform$OS.type
-  
-  # Function to execute system commands in a cross-platform way
-  exec_cmd <- function(cmd, args = NULL, ignore.stdout = FALSE, ignore.stderr = FALSE, wait = TRUE) {
-    tryCatch({
-      output <- system2(command = cmd, args = args, stdout = if (ignore.stdout) NULL else TRUE, 
-                        stderr = if (ignore.stderr) NULL else TRUE, wait = wait)
-      return(output)
-    }, error = function(e) {
-      message(sprintf("Command execution error: %s", paste(c(cmd, args), collapse = " ")))
-      message(e$message)
-      return(NULL)
-    })
-  }
-  
-  # Function to check if Docker is installed
-  docker_installed <- function() {
-    res <- exec_cmd("docker", args = "--version", ignore.stdout = TRUE, ignore.stderr = TRUE)
-    return(!is.null(res))
-  }
-  
-  if (!docker_installed()) {
-    stop("Docker is not installed or not available in PATH. Please install Docker and ensure it's running.")
-  }
-  
-  # Function to check if a container exists using docker inspect
+  # Function to check if a container exists
   container_exists <- function(name) {
-    res <- exec_cmd("docker", args = c("inspect", name), ignore.stderr = TRUE, ignore.stdout = TRUE)
-    return(!is.null(res))
+    existing <- system(sprintf("docker ps -a --filter name=^/%s$ --format '{{.Names}}'", name), intern = TRUE)
+    return(name %in% existing)
   }
   
-  # Function to check if a container is running using docker inspect
+  # Function to check if a container is running
   container_running <- function(name) {
-    res <- exec_cmd("docker", args = c("inspect", "-f", "{{.State.Running}}", name), ignore.stderr = TRUE, ignore.stdout = TRUE)
-    return(!is.null(res) && tolower(res) == "true")
+    running <- system(sprintf("docker ps --filter name=^/%s$ --filter status=running --format '{{.Names}}'", name), intern = TRUE)
+    return(name %in% running)
   }
   
   # Function to start a stopped container
   start_container <- function(name) {
     message(sprintf("Starting existing container '%s'...", name))
-    exec_cmd("docker", args = c("start", name), ignore.stderr = TRUE, ignore.stdout = TRUE)
+    system(sprintf("docker start %s", name), ignore.stderr = TRUE, ignore.stdout = TRUE)
   }
   
   # Function to run a new container
   run_container <- function(image, name, host_port, container_port, password) {
-    run_cmd <- c(
-      "run", "-d",
-      "-p", sprintf("%d:%d", host_port, container_port),
-      "--name", name,
-      "-e", sprintf("PASSWORD=%s", password),
+    run_cmd <- sprintf(
+      "docker run -d -p %d:%d --name %s -e PASSWORD=%s %s",
+      host_port,
+      container_port,
+      name,
+      password,
       image
     )
-    message(sprintf("Executing: docker %s", paste(run_cmd, collapse = " ")))
-    exec_cmd("docker", args = run_cmd)
+    message(sprintf("Executing: %s", run_cmd))
+    system(run_cmd, intern = FALSE, ignore.stderr = FALSE)
   }
   
   # Function to stop a running container
   stop_container <- function(name) {
     message(sprintf("Stopping container '%s'...", name))
-    exec_cmd("docker", args = c("stop", name), ignore.stderr = TRUE, ignore.stdout = TRUE)
+    system(sprintf("docker stop %s", name), ignore.stderr = TRUE, ignore.stdout = TRUE)
   }
   
   # Function to remove a container
   remove_container <- function(name) {
     message(sprintf("Removing container '%s'...", name))
-    exec_cmd("docker", args = c("rm", name), ignore.stderr = TRUE, ignore.stdout = TRUE)
-  }
-  
-  # Function to open URL in the default browser
-  open_url <- function(url) {
-    try({
-      utils::browseURL(url)
-    }, silent = TRUE)
+    system(sprintf("docker rm %s", name), ignore.stderr = TRUE, ignore.stdout = TRUE)
   }
   
   if (action == "start") {
@@ -103,7 +71,9 @@ manage_rstudio_server <- function(
         # Open URL in browser since the container is running
         url <- sprintf("http://localhost:%d", host_port)
         message(sprintf("Access it at: %s", url))
-        open_url(url)
+        try({
+          browseURL(url)
+        }, silent = TRUE)
       } else {
         start_container(container_name)
         # Optionally, verify if the container started successfully
@@ -112,10 +82,12 @@ manage_rstudio_server <- function(
           message("RStudio Server has been started.")
           url <- sprintf("http://localhost:%d", host_port)
           message(sprintf("Access it at: %s", url))
-          open_url(url)
+          try({
+            browseURL(url)
+          }, silent = TRUE)
         } else {
           message("Failed to start RStudio Server. Check container logs for details.")
-          exec_cmd("docker", args = c("logs", container_name))
+          system(sprintf("docker logs %s", container_name), wait = TRUE)
         }
       }
     } else {
@@ -127,11 +99,13 @@ manage_rstudio_server <- function(
         message("RStudio Server is running.")
         url <- sprintf("http://localhost:%d", host_port)
         message(sprintf("Access it at: %s", url))
-        open_url(url)
+        try({
+          browseURL(url)
+        }, silent = TRUE)
       } else {
         message("Failed to start RStudio Server.")
         # Optionally, display container logs for debugging
-        exec_cmd("docker", args = c("logs", container_name))
+        system(sprintf("docker logs %s", container_name), wait = TRUE)
       }
     }
     
@@ -151,4 +125,3 @@ manage_rstudio_server <- function(
   }
 }
 
-    
