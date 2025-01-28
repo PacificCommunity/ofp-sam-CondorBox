@@ -29,7 +29,7 @@ manage_rstudio_server <- function(
       system2(command = cmd, args = args, stdout = if (ignore.stdout) NULL else "", 
               stderr = if (ignore.stderr) NULL else "", wait = wait)
     }, error = function(e) {
-      message(sprintf("Error executing command: %s", paste(c(cmd, args), collapse = " ")))
+      message(sprintf("Command execution error: %s", paste(c(cmd, args), collapse = " ")))
       message(e$message)
       return(NULL)
     })
@@ -45,15 +45,15 @@ manage_rstudio_server <- function(
     stop("Docker is not installed or not available in PATH. Please install Docker and ensure it's running.")
   }
   
-  # Function to check if a container exists
+  # Function to check if a container exists (without leading slash)
   container_exists <- function(name) {
-    existing <- exec_cmd("docker", args = c("ps", "-a", "--filter", sprintf("name=^/%s$", name), "--format", "{{.Names}}"))
+    existing <- exec_cmd("docker", args = c("ps", "-a", "--filter", sprintf("name=^%s$", name), "--format", "{{.Names}}"))
     return(!is.null(existing) && name %in% existing)
   }
   
-  # Function to check if a container is running
+  # Function to check if a container is running (without leading slash)
   container_running <- function(name) {
-    running <- exec_cmd("docker", args = c("ps", "--filter", sprintf("name=^/%s$", name), "--filter", "status=running", "--format", "{{.Names}}"))
+    running <- exec_cmd("docker", args = c("ps", "--filter", sprintf("name=^%s$", name), "--filter", "status=running", "--format", "{{.Names}}"))
     return(!is.null(running) && name %in% running)
   }
   
@@ -149,5 +149,6 @@ manage_rstudio_server <- function(
     }
   }
 }
+
 
 
