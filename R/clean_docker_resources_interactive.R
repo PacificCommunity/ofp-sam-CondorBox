@@ -20,6 +20,9 @@ clean_docker_resources_interactive <- function(cli = "docker") {
     return(result)
   }
   
+  # Determine the operating system
+  os_type <- .Platform$OS.type  # "windows" or "unix"
+  
   # Check if we're actually using "podman" based on docker --version
   cli <- if (tryCatch(
     grepl("podman", system("docker --version", intern = TRUE, ignore.stderr = TRUE)),
@@ -32,12 +35,29 @@ clean_docker_resources_interactive <- function(cli = "docker") {
   
   # Test Docker permissions quickly by running 'ps' 
   test_result <- run_docker_cmd(sprintf("%s ps", cli), show_cmd = FALSE)
+  
+  # Function to handle permission issues
+  handle_permission_denied <- function() {
+    if (os_type == "windows") {
+      message("Permission denied. Please run R or RStudio as an Administrator and try again.")
+    } else {
+      message("It looks like you might need sudo to run Docker.")
+      use_sudo <- readline("Retry with 'sudo docker'? (y/n): ")
+      if (tolower(use_sudo) == "y") {
+        cli <<- "sudo docker"  # Update the cli variable in the parent environment
+        message("Switched to sudo docker.")
+      }
+    }
+  }
+  
   if (any(grepl("permission denied", test_result, ignore.case = TRUE))) {
-    message("It looks like you might need sudo to run Docker.")
-    use_sudo <- readline("Retry with 'sudo docker'? (y/n): ")
-    if (tolower(use_sudo) == "y") {
-      cli <- "sudo docker"
-      message("Switched to sudo docker.")
+    handle_permission_denied()
+    
+    # Re-test permissions after handling
+    test_result <- run_docker_cmd(sprintf("%s ps", cli), show_cmd = FALSE)
+    if (any(grepl("permission denied", test_result, ignore.case = TRUE))) {
+      message("Still encountering permission issues. Please ensure you have the necessary permissions.")
+      return(invisible(NULL))
     }
   }
   
@@ -88,20 +108,25 @@ clean_docker_resources_interactive <- function(cli = "docker") {
           remove_container_cmd <- sprintf("%s rm -f %s", cli, container_id)
           result <- run_docker_cmd(remove_container_cmd)
           
-          # Check if permission denied. If so, prompt for sudo unless we're already in sudo
-          if (any(grepl("permission denied", result, ignore.case = TRUE)) && 
-              !startsWith(cli, "sudo")) {
-            message("Permission denied. You may need sudo to remove containers.")
-            use_sudo <- readline("Retry with 'sudo docker'? (y/n): ")
-            if (tolower(use_sudo) == "y") {
-              cli <- "sudo docker"
-              stop_cmd <- sprintf("%s stop %s", cli, container_id)
-              kill_cmd <- sprintf("%s kill %s", cli, container_id)
-              remove_container_cmd <- sprintf("%s rm -f %s", cli, container_id)
-              
-              run_docker_cmd(stop_cmd)
-              run_docker_cmd(kill_cmd)
-              run_docker_cmd(remove_container_cmd)
+          # Check if permission denied. If so, prompt accordingly
+          if (any(grepl("permission denied", result, ignore.case = TRUE))) {
+            if (os_type == "windows") {
+              message("Permission denied. Please run R or RStudio as an Administrator and try again.")
+            } else if (!startsWith(cli, "sudo")) {
+              message("Permission denied. You may need sudo to remove containers.")
+              use_sudo <- readline("Retry with 'sudo docker'? (y/n): ")
+              if (tolower(use_sudo) == "y") {
+                cli <<- "sudo docker"  # Update the cli variable in the parent environment
+                message("Switched to sudo docker.")
+                # Retry the removal commands with sudo
+                stop_cmd <- sprintf("%s stop %s", cli, container_id)
+                kill_cmd <- sprintf("%s kill %s", cli, container_id)
+                remove_container_cmd <- sprintf("%s rm -f %s", cli, container_id)
+                
+                run_docker_cmd(stop_cmd)
+                run_docker_cmd(kill_cmd)
+                run_docker_cmd(remove_container_cmd)
+              }
             }
           }
         }
@@ -138,14 +163,19 @@ clean_docker_resources_interactive <- function(cli = "docker") {
           result <- run_docker_cmd(remove_images_cmd)
           
           # Check permission denial again
-          if (any(grepl("permission denied", result, ignore.case = TRUE)) && 
-              !startsWith(cli, "sudo")) {
-            message("Permission denied. You may need sudo to remove images.")
-            use_sudo <- readline("Retry with 'sudo docker'? (y/n): ")
-            if (tolower(use_sudo) == "y") {
-              cli <- "sudo docker"
-              remove_images_cmd <- sprintf("%s rmi -f %s", cli, image_id)
-              run_docker_cmd(remove_images_cmd)
+          if (any(grepl("permission denied", result, ignore.case = TRUE))) {
+            if (os_type == "windows") {
+              message("Permission denied. Please run R or RStudio as an Administrator and try again.")
+            } else if (!startsWith(cli, "sudo")) {
+              message("Permission denied. You may need sudo to remove images.")
+              use_sudo <- readline("Retry with 'sudo docker'? (y/n): ")
+              if (tolower(use_sudo) == "y") {
+                cli <<- "sudo docker"  # Update the cli variable in the parent environment
+                message("Switched to sudo docker.")
+                # Retry the removal command with sudo
+                remove_images_cmd <- sprintf("%s rmi -f %s", cli, image_id)
+                run_docker_cmd(remove_images_cmd)
+              }
             }
           }
         }
@@ -159,7 +189,5 @@ clean_docker_resources_interactive <- function(cli = "docker") {
     message("\nAn error occurred: ", e$message)
   })
 }
-
-
 
 
