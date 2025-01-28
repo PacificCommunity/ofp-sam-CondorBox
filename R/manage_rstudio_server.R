@@ -26,8 +26,9 @@ manage_rstudio_server <- function(
   # Function to execute system commands in a cross-platform way
   exec_cmd <- function(cmd, args = NULL, ignore.stdout = FALSE, ignore.stderr = FALSE, wait = TRUE) {
     tryCatch({
-      system2(command = cmd, args = args, stdout = if (ignore.stdout) NULL else "", 
-              stderr = if (ignore.stderr) NULL else "", wait = wait)
+      output <- system2(command = cmd, args = args, stdout = if (ignore.stdout) NULL else TRUE, 
+                        stderr = if (ignore.stderr) NULL else TRUE, wait = wait)
+      return(output)
     }, error = function(e) {
       message(sprintf("Command execution error: %s", paste(c(cmd, args), collapse = " ")))
       message(e$message)
@@ -45,16 +46,16 @@ manage_rstudio_server <- function(
     stop("Docker is not installed or not available in PATH. Please install Docker and ensure it's running.")
   }
   
-  # Function to check if a container exists (without leading slash)
+  # Function to check if a container exists using docker inspect
   container_exists <- function(name) {
-    existing <- exec_cmd("docker", args = c("ps", "-a", "--filter", sprintf("name=^%s$", name), "--format", "{{.Names}}"))
-    return(!is.null(existing) && name %in% existing)
+    res <- exec_cmd("docker", args = c("inspect", name), ignore.stderr = TRUE, ignore.stdout = TRUE)
+    return(!is.null(res))
   }
   
-  # Function to check if a container is running (without leading slash)
+  # Function to check if a container is running using docker inspect
   container_running <- function(name) {
-    running <- exec_cmd("docker", args = c("ps", "--filter", sprintf("name=^%s$", name), "--filter", "status=running", "--format", "{{.Names}}"))
-    return(!is.null(running) && name %in% running)
+    res <- exec_cmd("docker", args = c("inspect", "-f", "{{.State.Running}}", name), ignore.stderr = TRUE, ignore.stdout = TRUE)
+    return(!is.null(res) && tolower(res) == "true")
   }
   
   # Function to start a stopped container
@@ -150,5 +151,4 @@ manage_rstudio_server <- function(
   }
 }
 
-
-
+    
