@@ -3,18 +3,28 @@ title: "Launching RStudio Server with CondorBox"
 author: "Kyuhan Kim"
 date: January 29, 2025
 format:
-  html:
-    toc: true
-    toc-location: left
-    theme: united
+  pdf:
+    toc: false
+    toc-depth: 2
+    toc-title: "Table of Contents"
+    number-sections: false
+    includes:
+      in-header: |
+        \usepackage{hyperref}
+        \hypersetup{
+          colorlinks=true,
+          linkcolor=blue,
+          urlcolor=blue,
+        }
     highlight-style: tango
 ---
 
-## Introduction
+# Introduction
 
 This guide provides a step-by-step approach to launching an **RStudio Server** within a Docker container using the `CondorBox` package. By containerizing RStudio Server, you ensure a **consistent development environment** across different users and projects, which is crucial for **reproducibility** in fisheries stock assessment workflows.
 
-The launch script is available in the `examples` folder as `launch_rserver.R` or can be generated using the `CondorBox::generate_rserver_template()` function.
+The launch script is available in the `examples` folder as `launch_rserver.R` or can be generated using the `CondorBox::generate_rserver_template()` function. For more information, visit the CondorBox GitHub repository at [https://github.com/PacificCommunity/ofp-sam-CondorBox](https://github.com/PacificCommunity/ofp-sam-CondorBox).
+
 
 ## Prerequisites
 
@@ -55,7 +65,7 @@ manage_rstudio_server(
 ```
 Once the server is up and running, access it via your web browser by navigating to:
 
-http://localhost:9999
+[http://localhost:9999](http://localhost:9999)
 
 Login Credentials:
 
@@ -85,7 +95,7 @@ For seamless interaction with GitHub repositories—such as cloning and committi
 
 ### Steps to Configure SSH Keys:
 
-- Access RStudio Server: Open your web browser and navigate to http://localhost:9999.
+- Access RStudio Server: Open your web browser and navigate to [http://localhost:9999](http://localhost:9999).
 - Log in using the credentials provided earlier.
 - Run the SSH Setup Function:
 
