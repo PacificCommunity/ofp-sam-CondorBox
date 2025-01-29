@@ -30,8 +30,7 @@ The launch script is available in the `examples` folder as `launch_rserver.R` or
 
 Before you begin, ensure that the following prerequisites are satisfied:
 
-- **Docker**: Installed and running on your machine.
-- **RStudio Server**: Installed and accessible.
+- **Docker**: Ensure Docker is installed and running on your machine. For Mac and Windows, Docker Desktop must be running in the background.
 - **CondorBox Package**: Installed in R.
 
 ## Installing and Loading CondorBox
@@ -58,6 +57,7 @@ To launch the RStudio Server, use the `manage_rstudio_server()` function. This f
 ```r
 manage_rstudio_server(
   action = "start",
+  container_name = "rstudio"      # Default name for the container
   image = "rocker/rstudio",       # Default RStudio Docker image
   host_port = 9999,               # Port to access RStudio in the browser
   password = "FAME"               # Login password for RStudio Server
@@ -67,10 +67,10 @@ Once the server is up and running, access it via your web browser by navigating 
 
 [http://localhost:9999](http://localhost:9999)
 
-Login Credentials:
+Login Credentials (password can be customised):
 
-- Username: rstudio
-- Password: FAME
+- **Username: rstudio**
+- **Password: FAME**
 
 ## Stopping the RStudio Server
 

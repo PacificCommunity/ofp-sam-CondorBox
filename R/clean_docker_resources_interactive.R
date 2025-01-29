@@ -5,10 +5,9 @@
 #' @param cli The CLI to use ("docker" or "podman"). Default is "docker".
 #' @export
 clean_docker_resources_interactive <- function(cli = "docker") {
-  # Internal function to run Docker commands, capture output, and show errors
   run_docker_cmd <- function(cmd, show_cmd = TRUE) {
     if (.Platform$OS.type == "windows") {
-      cmd <- paste("cmd.exe /c", cmd) # Use cmd.exe for Windows
+      cmd <- paste("cmd.exe /c", cmd)
     }
     if (show_cmd) {
       cat("\n[DEBUG] Running command:\n", cmd, "\n\n")
@@ -23,7 +22,6 @@ clean_docker_resources_interactive <- function(cli = "docker") {
     return(result)
   }
   
-  # Check if we're using "podman" based on docker --version
   cli <- if (tryCatch(
     grepl("podman", system("docker --version", intern = TRUE, ignore.stderr = TRUE)),
     error = function(e) FALSE
@@ -31,17 +29,6 @@ clean_docker_resources_interactive <- function(cli = "docker") {
     "podman"
   } else {
     "docker"
-  }
-  
-  # Test Docker permissions
-  test_result <- run_docker_cmd(sprintf("%s ps", cli), show_cmd = FALSE)
-  if (any(grepl("permission denied", test_result, ignore.case = TRUE))) {
-    message("It looks like you might need elevated permissions to run Docker.")
-    use_admin <- readline("Retry as administrator? (y/n): ")
-    if (tolower(use_admin) == "y") {
-      cli <- paste("runas /user:Administrator", cli)
-      message("Switched to administrator mode.")
-    }
   }
   
   message(sprintf("\nUsing CLI: %s", cli))
@@ -62,22 +49,37 @@ clean_docker_resources_interactive <- function(cli = "docker") {
     } else {
       cat("ID\tName\tStatus\n", paste(containers, collapse = "\n"), "\n")
       
-      # Prompt user for container IDs to remove
       remove_containers <- readline(
         "Enter container IDs to remove (comma-separated), or press Enter to skip: "
       )
-      remove_containers <- gsub("\\s+", "", remove_containers)  # Trim whitespace
+      remove_containers <- gsub("\\s+", "", remove_containers)
       
       if (nchar(remove_containers) > 0) {
         containers_vec <- strsplit(remove_containers, ",")[[1]]
         
-        # Stop, kill, and remove containers
         for (container_id in containers_vec) {
-          stop_cmd <- sprintf("%s stop %s", cli, container_id)
-          run_docker_cmd(stop_cmd)
+          # Check if container exists
+          check_exists_cmd <- sprintf("%s ps -a -q -f id=%s", cli, container_id)
+          exists <- run_docker_cmd(check_exists_cmd, show_cmd = FALSE)
           
-          kill_cmd <- sprintf("%s kill %s", cli, container_id)
-          run_docker_cmd(kill_cmd)
+          if (length(exists) == 0) {
+            message(sprintf("Container '%s' does not exist. Skipping...", container_id))
+            next
+          }
+          
+          # Check if container is running before stopping/killing
+          check_running_cmd <- sprintf("%s ps -q -f id=%s", cli, container_id)
+          running <- run_docker_cmd(check_running_cmd, show_cmd = FALSE)
+          
+          if (length(running) > 0) {
+            stop_cmd <- sprintf("%s stop %s", cli, container_id)
+            run_docker_cmd(stop_cmd)
+            
+            kill_cmd <- sprintf("%s kill %s", cli, container_id)
+            run_docker_cmd(kill_cmd)
+          } else {
+            message(sprintf("Container '%s' is already stopped.", container_id))
+          }
           
           remove_container_cmd <- sprintf("%s rm -f %s", cli, container_id)
           run_docker_cmd(remove_container_cmd)
@@ -109,7 +111,6 @@ clean_docker_resources_interactive <- function(cli = "docker") {
       if (nchar(remove_images) > 0) {
         images_vec <- strsplit(remove_images, ",")[[1]]
         
-        # Remove images
         for (image_id in images_vec) {
           remove_images_cmd <- sprintf("%s rmi -f %s", cli, image_id)
           run_docker_cmd(remove_images_cmd)
@@ -124,6 +125,7 @@ clean_docker_resources_interactive <- function(cli = "docker") {
     message("\nAn error occurred: ", e$message)
   })
 }
+
 
 
 
