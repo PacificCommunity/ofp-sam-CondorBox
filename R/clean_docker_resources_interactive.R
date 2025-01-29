@@ -14,7 +14,7 @@ clean_docker_resources_interactive <- function(cli = "docker") {
       cat("\n[DEBUG] Running command:\n", cmd, "\n\n")
     }
     result <- tryCatch(
-      system(cmd, intern = TRUE, ignore.stderr = FALSE), 
+      system(cmd, intern = TRUE, ignore.stderr = TRUE), 
       error = function(e) e$message
     )
     if (length(result) > 0 && is.character(result)) {
