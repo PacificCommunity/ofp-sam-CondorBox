@@ -23,7 +23,7 @@ clean_docker_resources_interactive <- function(cli = "docker") {
     return(result)
   }
   
-  # Check if we're actually using "podman" based on docker --version
+  # Check if we're using "podman" based on docker --version
   cli <- if (tryCatch(
     grepl("podman", system("docker --version", intern = TRUE, ignore.stderr = TRUE)),
     error = function(e) FALSE
@@ -33,14 +33,14 @@ clean_docker_resources_interactive <- function(cli = "docker") {
     "docker"
   }
   
-  # Test Docker permissions quickly by running 'ps' 
+  # Test Docker permissions
   test_result <- run_docker_cmd(sprintf("%s ps", cli), show_cmd = FALSE)
   if (any(grepl("permission denied", test_result, ignore.case = TRUE))) {
-    message("It looks like you might need sudo to run Docker.")
-    use_sudo <- readline("Retry with 'sudo docker'? (y/n): ")
-    if (tolower(use_sudo) == "y") {
-      cli <- "sudo docker"
-      message("Switched to sudo docker.")
+    message("It looks like you might need elevated permissions to run Docker.")
+    use_admin <- readline("Retry as administrator? (y/n): ")
+    if (tolower(use_admin) == "y") {
+      cli <- paste("runas /user:Administrator", cli)
+      message("Switched to administrator mode.")
     }
   }
   
@@ -51,7 +51,7 @@ clean_docker_resources_interactive <- function(cli = "docker") {
     # 1) List all containers
     # --------------------------------------------------
     message("\nListing all containers...")
-    list_containers_cmd <- sprintf("%s ps -a --format '{{.ID}}\t{{.Names}}\t{{.Status}}'", cli)
+    list_containers_cmd <- sprintf("%s ps -a --format \"{{.ID}}\\t{{.Names}}\\t{{.Status}}\"", cli)
     containers <- tryCatch(
       system(list_containers_cmd, intern = TRUE, ignore.stderr = TRUE),
       error = function(e) character(0)
@@ -71,42 +71,16 @@ clean_docker_resources_interactive <- function(cli = "docker") {
       if (nchar(remove_containers) > 0) {
         containers_vec <- strsplit(remove_containers, ",")[[1]]
         
-        # For each container, attempt to stop (or kill) before removing
+        # Stop, kill, and remove containers
         for (container_id in containers_vec) {
-          # First, try a graceful stop
           stop_cmd <- sprintf("%s stop %s", cli, container_id)
-          stop_result <- run_docker_cmd(stop_cmd)
+          run_docker_cmd(stop_cmd)
           
-          # If 'stop' doesn't work or if container is still "Up", we try kill
-          ps_output <- run_docker_cmd(sprintf("%s ps -a --format '{{.Status}}' --filter 'id=%s'", 
-                                              cli, container_id), 
-                                      show_cmd = FALSE)
-          if (length(ps_output) > 0 && any(grepl("^Up", ps_output))) {
-            # Container is still running, so let's kill
-            kill_cmd <- sprintf("%s kill %s", cli, container_id)
-            run_docker_cmd(kill_cmd)
-          }
+          kill_cmd <- sprintf("%s kill %s", cli, container_id)
+          run_docker_cmd(kill_cmd)
           
-          # Finally, remove the container with -f
           remove_container_cmd <- sprintf("%s rm -f %s", cli, container_id)
-          result <- run_docker_cmd(remove_container_cmd)
-          
-          # Check if permission denied. If so, prompt for sudo unless we're already in sudo
-          if (any(grepl("permission denied", result, ignore.case = TRUE)) && 
-              !startsWith(cli, "sudo")) {
-            message("Permission denied. You may need sudo to remove containers.")
-            use_sudo <- readline("Retry with 'sudo docker'? (y/n): ")
-            if (tolower(use_sudo) == "y") {
-              cli <- "sudo docker"
-              stop_cmd <- sprintf("%s stop %s", cli, container_id)
-              kill_cmd <- sprintf("%s kill %s", cli, container_id)
-              remove_container_cmd <- sprintf("%s rm -f %s", cli, container_id)
-              
-              run_docker_cmd(stop_cmd)
-              run_docker_cmd(kill_cmd)
-              run_docker_cmd(remove_container_cmd)
-            }
-          }
+          run_docker_cmd(remove_container_cmd)
         }
         message("Selected containers removed (if they existed).")
       }
@@ -116,7 +90,7 @@ clean_docker_resources_interactive <- function(cli = "docker") {
     # 2) List all images
     # --------------------------------------------------
     message("\nListing all images...")
-    list_images_cmd <- sprintf("%s images --format '{{.ID}}\t{{.Repository}}\t{{.Tag}}'", cli)
+    list_images_cmd <- sprintf("%s images --format \"{{.ID}}\\t{{.Repository}}\\t{{.Tag}}\"", cli)
     images <- tryCatch(
       system(list_images_cmd, intern = TRUE, ignore.stderr = TRUE),
       error = function(e) character(0)
@@ -138,19 +112,7 @@ clean_docker_resources_interactive <- function(cli = "docker") {
         # Remove images
         for (image_id in images_vec) {
           remove_images_cmd <- sprintf("%s rmi -f %s", cli, image_id)
-          result <- run_docker_cmd(remove_images_cmd)
-          
-          # Check permission denial again
-          if (any(grepl("permission denied", result, ignore.case = TRUE)) && 
-              !startsWith(cli, "sudo")) {
-            message("Permission denied. You may need sudo to remove images.")
-            use_sudo <- readline("Retry with 'sudo docker'? (y/n): ")
-            if (tolower(use_sudo) == "y") {
-              cli <- "sudo docker"
-              remove_images_cmd <- sprintf("%s rmi -f %s", cli, image_id)
-              run_docker_cmd(remove_images_cmd)
-            }
-          }
+          run_docker_cmd(remove_images_cmd)
         }
         message("Selected images removed (if they existed).")
       }
@@ -162,7 +124,6 @@ clean_docker_resources_interactive <- function(cli = "docker") {
     message("\nAn error occurred: ", e$message)
   })
 }
-
 
 
 
