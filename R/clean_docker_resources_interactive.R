@@ -7,6 +7,9 @@
 clean_docker_resources_interactive <- function(cli = "docker") {
   # Internal function to run Docker commands, capture output, and show errors
   run_docker_cmd <- function(cmd, show_cmd = TRUE) {
+    if (.Platform$OS.type == "windows") {
+      cmd <- paste("cmd.exe /c", cmd) # Use cmd.exe for Windows
+    }
     if (show_cmd) {
       cat("\n[DEBUG] Running command:\n", cmd, "\n\n")
     }
