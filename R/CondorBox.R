@@ -171,6 +171,7 @@ Queue
   })
   
   # 7. Delete clone_job.sh from the remote server regardless of submission success
+  Sys.sleep(10)  # Wait for 10 seconds
   message("Deleting clone_job.sh from the remote server...")
   system(sprintf("ssh %s@%s 'rm -f %s/%s'", remote_user, remote_host, remote_dir, clone_script))
   
