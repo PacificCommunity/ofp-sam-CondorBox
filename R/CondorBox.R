@@ -26,6 +26,7 @@
 #'   and submission of an HTCondor job.
 #'
 #' @export
+
 CondorBox <- function(
     remote_user,
     remote_host,
@@ -168,7 +169,7 @@ Queue
     message("Configuring docker credential helper on remote server...")
     if (tolower(remote_os) == "windows") {
       # Windows용 credential helper (예: wincred) 사용
-      config_cmd <- "mkdir %USERPROFILE%\\\.docker && echo {\\\"credsStore\\\":\\\"wincred\\\"} > %USERPROFILE%\\\.docker\\config.json"
+      config_cmd <- "mkdir %USERPROFILE%\\.docker && echo {\\\"credsStore\\\":\\\"wincred\\\"} > %USERPROFILE%\\.docker\\config.json"
     } else {
       # Linux/Unix용 credential helper (예: pass) 사용
       config_cmd <- "mkdir -p ~/.docker && echo '{\"credsStore\": \"pass\"}' > ~/.docker/config.json"
