@@ -109,6 +109,7 @@ manage_rstudio_server <- function(
     exec_cmd("docker", args = c("start", name), ignore.stderr = TRUE, ignore.stdout = TRUE)
   }
   
+<<<<<<< HEAD
   # Function to format Windows paths for Docker (if needed)
   format_docker_path <- function(path) {
     if (is_windows) {
@@ -166,6 +167,22 @@ manage_rstudio_server <- function(
       env_args <- get_renviron_vars()
     }
     
+=======
+  # Function to check if an image exists locally
+  image_exists <- function(image) {
+    result <- exec_cmd("docker", args = c("images", "--format", "{{.Repository}}:{{.Tag}}"))
+    return(!is.null(result) && any(grepl(image, result)))
+  }
+  
+  run_container <- function(image, name, host_port, container_port, password) {
+    # Check if the image exists, if not, pull it
+    if (!image_exists(image)) {
+      message(sprintf("Image '%s' not found locally. Pulling from registry...", image))
+      exec_cmd("docker", args = c("pull", image))
+    }
+    
+    # Run the container
+>>>>>>> 86bd8a51d2c5a8ffcdd96106cf1bdc9df0a7023d
     run_cmd <- c(
       "run", "-d",
       "-p", sprintf("%d:%d", host_port, container_port),
