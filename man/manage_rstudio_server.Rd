@@ -10,7 +10,11 @@ manage_rstudio_server(
   container_name = "rstudio",
   host_port = 9999,
   container_port = 8787,
-  password = "yourpassword"
+  password = "yourpassword",
+  ghcr_login = FALSE,
+  github_username = NULL,
+  github_token = NULL,
+  transfer_env = FALSE
 )
 }
 \arguments{
@@ -23,6 +27,16 @@ manage_rstudio_server(
 \item{host_port}{The port on the host machine. Default is 8787.}
 
 \item{container_port}{The port inside the container. Default is 8787.}
+
+\item{password}{The password to set for RStudio Server. Default is "yourpassword".}
+
+\item{ghcr_login}{Logical indicating whether to log in to GitHub Container Registry (ghcr.io). Default is FALSE.}
+
+\item{github_username}{The GitHub username for ghcr.io login. Required if ghcr_login is TRUE.}
+
+\item{github_token}{The GitHub personal access token for ghcr.io login. Required if ghcr_login is TRUE.}
+
+\item{transfer_env}{Logical indicating whether to transfer environment variables from ~/.Renviron to the container. Default is FALSE.}
 }
 \description{
 This function starts or stops an RStudio Server container using Docker or Podman.
