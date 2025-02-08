@@ -34,6 +34,7 @@ CondorBox <- function(
     github_username,
     github_org,
     github_repo,
+    branch = "main",
     docker_image,
     target_folder = NULL,
     condor_cpus = NULL,
@@ -63,6 +64,7 @@ export GITHUB_PAT='%s'
 export GITHUB_USERNAME='%s'
 export GITHUB_ORGANIZATION='%s'
 export GITHUB_REPO='%s'
+export GITHUB_BRANCH='%s'
 %s
 
 if [[ -n \"$GITHUB_TARGET_FOLDER\" ]]; then
@@ -70,12 +72,12 @@ if [[ -n \"$GITHUB_TARGET_FOLDER\" ]]; then
     git remote add origin https://$GITHUB_USERNAME:$GITHUB_PAT@github.com/$GITHUB_ORGANIZATION/$GITHUB_REPO.git
     git config core.sparseCheckout true
     echo \"$GITHUB_TARGET_FOLDER/\" >> .git/info/sparse-checkout
-    git pull origin main
+    git pull origin $GITHUB_BRANCH
 else
-    git clone https://$GITHUB_USERNAME:$GITHUB_PAT@github.com/$GITHUB_ORGANIZATION/$GITHUB_REPO.git
+    git clone -b $GITHUB_BRANCH https://$GITHUB_USERNAME:$GITHUB_PAT@github.com/$GITHUB_ORGANIZATION/$GITHUB_REPO.git
 fi
 ", 
-                                  github_pat, github_username, github_org, github_repo,
+                                  github_pat, github_username, github_org, github_repo, branch,
                                   if (!is.null(target_folder)) sprintf("export GITHUB_TARGET_FOLDER='%s'", target_folder) else "")
   
   # Write the clone script
@@ -110,8 +112,7 @@ make %s
 cd ..
 echo \"Archiving folder: $WORK_DIR...\"
 tar -czvf output_archive.tar.gz \"$WORK_DIR\"
-", 
-                                clone_script, clone_script, make_options, make_options)
+", clone_script, clone_script, make_options, make_options)
   
   # Write the run script
   writeLines(run_script_content, con = run_script, sep = "\n")
