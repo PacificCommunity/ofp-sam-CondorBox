@@ -14,7 +14,8 @@ manage_rstudio_server(
   ghcr_login = FALSE,
   github_username = NULL,
   github_token = NULL,
-  transfer_env = FALSE
+  transfer_env = FALSE,
+  local_dir = NULL
 )
 }
 \arguments{
@@ -37,6 +38,8 @@ manage_rstudio_server(
 \item{github_token}{The GitHub personal access token for ghcr.io login. Required if ghcr_login is TRUE.}
 
 \item{transfer_env}{Logical indicating whether to transfer environment variables from ~/.Renviron to the container. Default is FALSE.}
+
+\item{local_dir}{The path to the local directory to mount into RStudio Server. Default is NULL.}
 }
 \description{
 This function starts or stops an RStudio Server container using Docker or Podman.

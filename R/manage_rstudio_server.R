@@ -13,6 +13,7 @@
 #' @param github_username The GitHub username for ghcr.io login. Required if ghcr_login is TRUE.
 #' @param github_token The GitHub personal access token for ghcr.io login. Required if ghcr_login is TRUE.
 #' @param transfer_env Logical indicating whether to transfer environment variables from ~/.Renviron to the container. Default is FALSE.
+#' @param local_dir The path to the local directory to mount into RStudio Server. Default is NULL.
 #' @export
 
 
@@ -26,7 +27,8 @@ manage_rstudio_server <- function(
     ghcr_login = FALSE,
     github_username = NULL,
     github_token = NULL,
-    transfer_env = FALSE  # If TRUE, transfers only environment variables from ~/.Renviron
+    transfer_env = FALSE,  # If TRUE, transfers only environment variables from ~/.Renviron
+    local_dir = NULL       # Path to the local directory to mount into RStudio Server
 ) {
   action <- match.arg(action)
   
@@ -149,8 +151,8 @@ manage_rstudio_server <- function(
     return(env_args)
   }
   
-  # Function to run a new container (without mount options)
-  run_container <- function(image, name, host_port, container_port, password) {
+  # Function to run a new container with optional volume mount for local files
+  run_container <- function(image, name, host_port, container_port, password, local_dir = NULL) {
     if (ghcr_login) {
       if (!is.null(github_username) && !is.null(github_token)) {
         message("Logging in using GitHub credentials...")
@@ -167,12 +169,20 @@ manage_rstudio_server <- function(
       env_args <- get_renviron_vars()
     }
     
+    volume_args <- c()
+    if (!is.null(local_dir)) {
+      local_dir <- format_docker_path(local_dir)
+      volume_args <- c("-v", sprintf("%s:/home/rstudio/%s", local_dir, basename(local_dir)))
+    }
+    
+    # Note: The volume options must appear before the image name.
     run_cmd <- c(
       "run", "-d",
       "-p", sprintf("%d:%d", host_port, container_port),
       "--name", name,
       "-e", sprintf("PASSWORD=%s", password),
       env_args,
+      volume_args,
       image
     )
     
@@ -206,7 +216,7 @@ manage_rstudio_server <- function(
         }
       }
     } else {
-      run_container(image, container_name, host_port, container_port, password)
+      run_container(image, container_name, host_port, container_port, password, local_dir)
       Sys.sleep(3)
       if (container_running(container_name)) {
         message("RStudio Server is running.")
@@ -218,5 +228,3 @@ manage_rstudio_server <- function(
     }
   }
 }
-
-
