@@ -38,8 +38,7 @@ CondorBox <- function(
     target_folder = NULL,
     condor_cpus = NULL,
     condor_memory = NULL,
-    make_options = "all", # Default make options
-    branch = "main" # Default branch to pull
+    make_options = "all" # Default make options
 ) {
   # Helper function to normalize paths for Windows
   normalize_path <- function(path) {
@@ -71,16 +70,13 @@ if [[ -n \"$GITHUB_TARGET_FOLDER\" ]]; then
     git remote add origin https://$GITHUB_USERNAME:$GITHUB_PAT@github.com/$GITHUB_ORGANIZATION/$GITHUB_REPO.git
     git config core.sparseCheckout true
     echo \"$GITHUB_TARGET_FOLDER/\" >> .git/info/sparse-checkout
-    git pull origin %s
+    git pull origin main
 else
     git clone https://$GITHUB_USERNAME:$GITHUB_PAT@github.com/$GITHUB_ORGANIZATION/$GITHUB_REPO.git
-    cd $GITHUB_REPO || exit 1
-    git checkout %s
 fi
 ", 
                                   github_pat, github_username, github_org, github_repo,
-                                  if (!is.null(target_folder)) sprintf("export GITHUB_TARGET_FOLDER='%s'", target_folder) else "",
-                                  branch, branch)
+                                  if (!is.null(target_folder)) sprintf("export GITHUB_TARGET_FOLDER='%s'", target_folder) else "")
   
   # Write the clone script
   writeLines(clone_script_content, con = clone_script, sep = "\n")
@@ -162,7 +158,7 @@ Queue
   
   # Introduce a delay to ensure the files are written and accessible
   message("Waiting briefly to ensure file transfer completion...")
-  Sys.sleep(10)  # Wait for 5 seconds
+  Sys.sleep(5)  # Wait for 5 seconds
   
   # 6. Submit the Condor job on the remote server
   message("Submitting the Condor job on the remote server...")
@@ -174,7 +170,6 @@ Queue
   })
   
   # 7. Delete clone_job.sh from the remote server regardless of submission success
-  Sys.sleep(30)  # Wait for 10 seconds
   message("Deleting clone_job.sh from the remote server...")
   system(sprintf("ssh %s@%s 'rm -f %s/%s'", remote_user, remote_host, remote_dir, clone_script))
   
