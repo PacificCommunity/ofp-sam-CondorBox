@@ -39,9 +39,11 @@ CondorBox <- function(
     target_folder = NULL,
     condor_cpus = NULL,
     condor_memory = NULL,
-    make_options = "all" # Default make options
+    make_options = "all", # Default make options
+    ghcr_login = FALSE,
+    remote_os = "linux"   # "linux" (default) or "windows"
 ) {
-  # Helper function to normalize paths for Windows
+  # Helper function to normalize paths for Windows (local side)
   normalize_path <- function(path) {
     if (.Platform$OS.type == "windows") {
       normalizePath(path, winslash = "/", mustWork = FALSE)
@@ -54,7 +56,7 @@ CondorBox <- function(
   clone_script <- "clone_job.sh"
   run_script <- "run_job.sh"
   
-  # Ensure paths are Windows-compatible
+  # Ensure paths are Windows-compatible (local side)
   remote_dir <- normalize_path(remote_dir)
   
   # 1. Create the clone_job.sh script
@@ -160,6 +162,29 @@ Queue
   # Introduce a delay to ensure the files are written and accessible
   message("Waiting briefly to ensure file transfer completion...")
   Sys.sleep(5)  # Wait for 5 seconds
+  
+  # 5.5. If ghcr_login option is enabled, configure credential helper and perform docker login on the remote server
+  if (ghcr_login) {
+    message("Configuring docker credential helper on remote server...")
+    if (tolower(remote_os) == "windows") {
+      # Windows용 credential helper (예: wincred) 사용
+      config_cmd <- "mkdir %USERPROFILE%\\\.docker && echo {\\\"credsStore\\\":\\\"wincred\\\"} > %USERPROFILE%\\\.docker\\config.json"
+    } else {
+      # Linux/Unix용 credential helper (예: pass) 사용
+      config_cmd <- "mkdir -p ~/.docker && echo '{\"credsStore\": \"pass\"}' > ~/.docker/config.json"
+    }
+    system(sprintf("ssh %s@%s '%s'", remote_user, remote_host, config_cmd))
+    
+    message("Performing docker login on remote server to bypass pull limits...")
+    login_cmd <- sprintf("echo %s | docker login ghcr.io -u %s --password-stdin", 
+                         shQuote(github_pat), github_username)
+    login_status <- system(sprintf("ssh %s@%s '%s'", remote_user, remote_host, login_cmd))
+    if (login_status == 0) {
+      message("Docker login on remote server succeeded.")
+    } else {
+      message("Docker login on remote server failed.")
+    }
+  }
   
   # 6. Submit the Condor job on the remote server
   message("Submitting the Condor job on the remote server...")
