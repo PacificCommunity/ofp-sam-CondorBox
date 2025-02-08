@@ -38,7 +38,8 @@ CondorBox <- function(
     target_folder = NULL,
     condor_cpus = NULL,
     condor_memory = NULL,
-    make_options = "all" # Default make options
+    make_options = "all", # Default make options
+    branch = "main" # Default branch to pull
 ) {
   # Helper function to normalize paths for Windows
   normalize_path <- function(path) {
@@ -70,13 +71,16 @@ if [[ -n \"$GITHUB_TARGET_FOLDER\" ]]; then
     git remote add origin https://$GITHUB_USERNAME:$GITHUB_PAT@github.com/$GITHUB_ORGANIZATION/$GITHUB_REPO.git
     git config core.sparseCheckout true
     echo \"$GITHUB_TARGET_FOLDER/\" >> .git/info/sparse-checkout
-    git pull origin main
+    git pull origin %s
 else
     git clone https://$GITHUB_USERNAME:$GITHUB_PAT@github.com/$GITHUB_ORGANIZATION/$GITHUB_REPO.git
+    cd $GITHUB_REPO || exit 1
+    git checkout %s
 fi
 ", 
                                   github_pat, github_username, github_org, github_repo,
-                                  if (!is.null(target_folder)) sprintf("export GITHUB_TARGET_FOLDER='%s'", target_folder) else "")
+                                  if (!is.null(target_folder)) sprintf("export GITHUB_TARGET_FOLDER='%s'", target_folder) else "",
+                                  branch, branch)
   
   # Write the clone script
   writeLines(clone_script_content, con = clone_script, sep = "\n")
