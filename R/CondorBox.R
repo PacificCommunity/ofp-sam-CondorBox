@@ -27,6 +27,7 @@
 #'
 #' @export
 
+
 CondorBox <- function(
     remote_user,
     remote_host,
@@ -166,19 +167,21 @@ Queue
   
   # 5.5. If ghcr_login option is enabled, configure credential helper and perform docker login on the remote server
   if (ghcr_login) {
-    message("Configuring docker credential helper on remote server...")
     if (tolower(remote_os) == "windows") {
-      # Windows용 credential helper (예: wincred) 사용
-      config_cmd <- "mkdir %USERPROFILE%\\.docker && echo {\\\"credsStore\\\":\\\"wincred\\\"} > %USERPROFILE%\\.docker\\config.json"
+      message("Configuring docker credential helper on remote Windows server...")
+      config_cmd <- "mkdir %USERPROFILE%\\.docker && echo \"{\\\"credsStore\\\": \\\"wincred\\\"}\" > %USERPROFILE%\\.docker\\config.json"
+      system(sprintf("ssh %s@%s '%s'", remote_user, remote_host, config_cmd))
+      login_cmd <- sprintf("echo %s | docker login ghcr.io -u %s --password-stdin", 
+                           shQuote(github_pat), github_username)
     } else {
-      # Linux/Unix용 credential helper (예: pass) 사용
-      config_cmd <- "mkdir -p ~/.docker && echo '{\"credsStore\": \"pass\"}' > ~/.docker/config.json"
+      message("Configuring minimal docker config on remote Linux server to avoid credential helper errors...")
+      # minimal config: 빈 JSON 객체를 사용하여, 별도의 credential helper를 사용하지 않도록 함.
+      config_cmd <- "mkdir -p /tmp/docker_config && echo '{}' > /tmp/docker_config/config.json"
+      system(sprintf("ssh %s@%s '%s'", remote_user, remote_host, config_cmd))
+      login_cmd <- sprintf("echo %s | DOCKER_CONFIG=/tmp/docker_config docker login ghcr.io -u %s --password-stdin", 
+                           shQuote(github_pat), github_username)
     }
-    system(sprintf("ssh %s@%s '%s'", remote_user, remote_host, config_cmd))
-    
     message("Performing docker login on remote server to bypass pull limits...")
-    login_cmd <- sprintf("echo %s | docker login ghcr.io -u %s --password-stdin", 
-                         shQuote(github_pat), github_username)
     login_status <- system(sprintf("ssh %s@%s '%s'", remote_user, remote_host, login_cmd))
     if (login_status == 0) {
       message("Docker login on remote server succeeded.")
