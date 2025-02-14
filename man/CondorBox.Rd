@@ -12,11 +12,14 @@ CondorBox(
   github_username,
   github_org,
   github_repo,
+  branch = "main",
   docker_image,
   target_folder = NULL,
   condor_cpus = NULL,
   condor_memory = NULL,
-  make_options = "all"
+  make_options = "all",
+  ghcr_login = FALSE,
+  remote_os = "linux"
 )
 }
 \arguments{

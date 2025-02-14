@@ -5,17 +5,17 @@
 \title{Manage RStudio Server Containers}
 \usage{
 manage_rstudio_server(
-  action = c("start", "stop"),
+  action = c("start", "stop", "remove"),
   image = "rocker/rstudio",
   container_name = "rstudio",
-  host_port = 9999,
   container_port = 8787,
   password = "yourpassword",
   ghcr_login = FALSE,
   github_username = NULL,
   github_token = NULL,
   transfer_env = FALSE,
-  local_dir = NULL
+  local_dir = NULL,
+  mount_github_config = FALSE
 )
 }
 \arguments{
@@ -24,8 +24,6 @@ manage_rstudio_server(
 \item{image}{The Docker image to use. Default is "rocker/rstudio".}
 
 \item{container_name}{The name of the container. Default is "rstudio".}
-
-\item{host_port}{The port on the host machine. Default is 8787.}
 
 \item{container_port}{The port inside the container. Default is 8787.}
 
@@ -40,6 +38,10 @@ manage_rstudio_server(
 \item{transfer_env}{Logical indicating whether to transfer environment variables from ~/.Renviron to the container. Default is FALSE.}
 
 \item{local_dir}{The path to the local directory to mount into RStudio Server. Default is NULL.}
+
+\item{mount_github_config}{Logical indicating whether to mount ~/.gitconfig and ~/.ssh into the container. Default is FALSE.}
+
+\item{host_port}{The port on the host machine. Default is 8787.}
 }
 \description{
 This function starts or stops an RStudio Server container using Docker or Podman.
