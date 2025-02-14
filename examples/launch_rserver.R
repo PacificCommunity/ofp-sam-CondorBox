@@ -11,7 +11,6 @@ library(CondorBox)
 ## Once the container is started, following command can also be used to access the same container
 manage_rstudio_server(action = "start", 
                       image = "rocker/rstudio",  ## this is the default image
-                      host_port = 9999, 
                       password = "FAME")  # login password for RStudio server (ID: rstudio, Password: FAME)
 
 
