@@ -200,12 +200,12 @@ Queue
   })
   
   # 7. Delete clone_job.sh from the remote server regardless of submission success
-  Sys.sleep(10)  # Wait for 10 seconds
-  message("Deleting clone_job.sh from the remote server...")
-  system(sprintf("ssh %s@%s 'rm -f %s/%s'", remote_user, remote_host, remote_dir, clone_script))
+  #Sys.sleep(10)  # Wait for 10 seconds
+  #message("Deleting clone_job.sh from the remote server...")
+  #system(sprintf("ssh %s@%s 'rm -f %s/%s'", remote_user, remote_host, remote_dir, clone_script))
   
   # 8. Clean up local files
-  unlink(c(clone_script, run_script, submit_file))
+  #unlink(c(clone_script, run_script, submit_file))
   
-  message("Cleanup completed.")
+  #message("Cleanup completed.")
 }
