@@ -45,7 +45,8 @@ CondorBox <- function(
     make_options = "all", # Default make options
     rmclone_script = "yes", # Default to deleting clone_job.sh after run
     ghcr_login = FALSE,
-    remote_os = "linux"   # "linux" (default) or "windows"
+    remote_os = "linux",   # "linux" (default) or "windows"
+    condor_environment = NULL
 ) {
   # Helper function to normalize paths for Windows (local side)
   normalize_path <- function(path) {
@@ -59,6 +60,7 @@ CondorBox <- function(
   # Define file names
   clone_script <- "clone_job.sh"
   run_script <- "run_job.sh"
+  env_script <- "job_env.txt"
   
   # Ensure paths are Windows-compatible (local side)
   remote_dir <- normalize_path(remote_dir)
@@ -91,37 +93,59 @@ fi
   
   # 2. Create the run_job.sh script
   run_script_content <- sprintf("
-#!/bin/bash
+#!/usr/bin/env bash
 
-# Source the clone script to perform the git clone
+# 1. Source the clone script to perform the git clone
 source %s
 
-# Save the working directory
+# 2. Load environment variables from job_env.txt (if present)
+if [[ -f \"%s\" ]]; then
+  # Prefix each line with 'export' and source
+  grep -E '^[A-Za-z_][A-Za-z0-9_]*=' \"%s\" \\
+    | sed 's/^/export /' > env_exports.sh
+  source env_exports.sh
+fi
+
+# 3. Save the working directory
 if [[ -n \"$GITHUB_TARGET_FOLDER\" ]]; then
     WORK_DIR=\"$GITHUB_TARGET_FOLDER\"
 else
     WORK_DIR=\"$GITHUB_REPO\"
 fi
 
-# Delete the clone script after sourcing it
+# 4. Delete the clone script after sourcing it
 rm -f %s
 
-# Unset the GitHub PAT
+# 5. Unset the GitHub PAT
 unset GITHUB_PAT
 
-# Change into the working directory and run make
+# 6. Change into the working directory and run make
 cd \"$WORK_DIR\" || exit 1
 echo \"Running make with options: %s\"
 make %s
 
-# Archive the directory
+# 7. Archive the directory
 cd ..
 echo \"Archiving folder: $WORK_DIR...\"
 tar -czvf output_archive.tar.gz \"$WORK_DIR\"
-", clone_script, clone_script, make_options, make_options)
+", 
+                                clone_script,    # 1st %s: clone_job.sh
+                                env_file,        # 2nd %s: job_env.txt
+                                env_file,        # 3rd %s: job_env.txt
+                                clone_script,    # 4th %s: clone_job.sh
+                                make_options,    # 5th %s: make options for echo
+                                make_options     # 6th %s: make options for make
+  )
   
   # Write the run script
   writeLines(run_script_content, con = run_script, sep = "\n")
+  
+  if (!is.null(condor_environment)) {
+    # condor_environment may be "VAR1=val1 VAR2=val2"
+    lines <- strsplit(condor_environment, "\\s+")[[1]]
+    writeLines(lines, env_file)
+  }
+  
   
   # 3. Create the Condor submit file
   condor_options <- c()
@@ -136,8 +160,25 @@ tar -czvf output_archive.tar.gz \"$WORK_DIR\"
     condor_options <- c(condor_options, sprintf("request_disk = %s", condor_disk))
   }
   
+  # Process environment variables
+  environment_string <- ""
+  if (!is.null(condor_environment)) {
+    if (is.list(condor_environment)) {
+      # Handle list format: list(VAR1 = "value1", VAR2 = "value2")
+      env_vars <- sapply(names(condor_environment), function(name) {
+        sprintf("%s=%s", name, condor_environment[[name]])
+      })
+      environment_string <- paste(env_vars, collapse = " ")
+    } else if (is.character(condor_environment)) {
+      # Handle string format: "VAR1=value1 VAR2=value2"
+      environment_string <- condor_environment
+    }
+  }
+  
+  # Combine all condor options
   condor_options <- paste(condor_options, collapse = "\n")
   
+  # 4. Create HTCondor submit file
   submit_file <- "condor_job.submit"
   submit_file_content <- sprintf("
 Universe   = docker
@@ -145,16 +186,23 @@ DockerImage = %s
 Executable = /bin/bash
 Arguments  = %s
 ShouldTransferFiles = YES
-TransferInputFiles = %s, %s
+TransferInputFiles = %s, %s, %s
 TransferOutputFiles = output_archive.tar.gz
 Output     = condor_job.out
 Error      = condor_job.err
 Log        = condor_job.log
-environment = IS_CONDOR_RUN=true
-%s
+getenv = True
+%s%s
 Queue
 ", 
-                                 docker_image, run_script, clone_script, run_script, condor_options)
+                                 docker_image, 
+                                 run_script, 
+                                 clone_script, 
+                                 run_script,
+                                 env_file,
+                                 if(nzchar(environment_string)) sprintf("environment = %s\n", environment_string) else "",
+                                 if(nzchar(condor_options)) paste0(condor_options, "\n") else ""
+  )
   
   writeLines(submit_file_content, con = submit_file, sep = "\n")
   
