@@ -41,7 +41,9 @@ CondorBox <- function(
     target_folder = NULL,
     condor_cpus = NULL,
     condor_memory = NULL,
+    condor_disk = NULL,
     make_options = "all", # Default make options
+    rmclone_script = "yes", # Default to deleting clone_job.sh after run
     ghcr_login = FALSE,
     remote_os = "linux"   # "linux" (default) or "windows"
 ) {
@@ -129,6 +131,11 @@ tar -czvf output_archive.tar.gz \"$WORK_DIR\"
   if (!is.null(condor_memory)) {
     condor_options <- c(condor_options, sprintf("request_memory = %s", condor_memory))
   }
+  
+  if (!is.null(condor_disk)) {
+    condor_options <- c(condor_options, sprintf("request_disk = %s", condor_disk))
+  }
+  
   condor_options <- paste(condor_options, collapse = "\n")
   
   submit_file <- "condor_job.submit"
@@ -175,7 +182,7 @@ Queue
                            shQuote(github_pat), github_username)
     } else {
       message("Configuring minimal docker config on remote Linux server to avoid credential helper errors...")
-      # minimal config: 빈 JSON 객체를 사용하여, 별도의 credential helper를 사용하지 않도록 함.
+      
       config_cmd <- "mkdir -p /tmp/docker_config && echo '{}' > /tmp/docker_config/config.json"
       system(sprintf("ssh %s@%s '%s'", remote_user, remote_host, config_cmd))
       login_cmd <- sprintf("echo %s | DOCKER_CONFIG=/tmp/docker_config docker login ghcr.io -u %s --password-stdin", 
@@ -200,9 +207,14 @@ Queue
   })
   
   # 7. Delete clone_job.sh from the remote server regardless of submission success
+  if(rmclone_script == "yes") {
+    message("Waiting for 20 seconds before deleting clone_job.sh from the remote server...")
   Sys.sleep(20)  # Wait for 10 seconds
   message("Deleting clone_job.sh from the remote server...")
   system(sprintf("ssh %s@%s 'rm -f %s/%s'", remote_user, remote_host, remote_dir, clone_script))
+  } else {
+    message("Skipping deletion of clone_job.sh from the remote server as per user request.")
+  }
   
   # 8. Clean up local files
   unlink(c(clone_script, run_script, submit_file))
