@@ -28,6 +28,9 @@
 #' @export
 
 
+
+
+
 CondorBox <- function(
     remote_user,
     remote_host,
@@ -60,7 +63,7 @@ CondorBox <- function(
   # Define file names
   clone_script <- "clone_job.sh"
   run_script <- "run_job.sh"
-  env_script <- "job_env.txt"
+  env_file <- "job_env.txt"
   
   # Ensure paths are Windows-compatible (local side)
   remote_dir <- normalize_path(remote_dir)
@@ -214,6 +217,7 @@ Queue
   message("Transferring the scripts and submit file to the remote server...")
   system(sprintf("scp %s %s@%s:%s/%s", clone_script, remote_user, remote_host, remote_dir, clone_script))
   system(sprintf("scp %s %s@%s:%s/%s", run_script, remote_user, remote_host, remote_dir, run_script))
+  system(sprintf("scp %s %s@%s:%s/%s", env_file, remote_user, remote_host, remote_dir, env_file))
   system(sprintf("scp %s %s@%s:%s/%s", submit_file, remote_user, remote_host, remote_dir, submit_file))
   
   # Introduce a delay to ensure the files are written and accessible
@@ -257,9 +261,9 @@ Queue
   # 7. Delete clone_job.sh from the remote server regardless of submission success
   if(rmclone_script == "yes") {
     message("Waiting for 20 seconds before deleting clone_job.sh from the remote server...")
-  Sys.sleep(20)  # Wait for 10 seconds
-  message("Deleting clone_job.sh from the remote server...")
-  system(sprintf("ssh %s@%s 'rm -f %s/%s'", remote_user, remote_host, remote_dir, clone_script))
+    Sys.sleep(20)  # Wait for 10 seconds
+    message("Deleting clone_job.sh from the remote server...")
+    system(sprintf("ssh %s@%s 'rm -f %s/%s'", remote_user, remote_host, remote_dir, clone_script))
   } else {
     message("Skipping deletion of clone_job.sh from the remote server as per user request.")
   }
@@ -269,3 +273,4 @@ Queue
   
   message("Cleanup completed.")
 }
+
