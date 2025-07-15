@@ -39,6 +39,8 @@ CondorBox <- function(
     github_username,
     github_org,
     github_repo,
+    stream_out = "FALSE", # Default to streaming output
+    stream_error = "FALSE",
     branch = "main",
     docker_image,
     target_folder = NULL,
@@ -143,11 +145,41 @@ tar -czvf output_archive.tar.gz \"$WORK_DIR\"
   # Write the run script
   writeLines(run_script_content, con = run_script, sep = "\n")
   
+  # Environment variable processing with quoting to preserve spaces
   if (!is.null(condor_environment)) {
-    # condor_environment may be "VAR1=val1 VAR2=val2"
-    lines <- strsplit(condor_environment, "\\s+")[[1]]
-    writeLines(lines, env_file)
+    if (is.list(condor_environment)) {
+      # Handle list format: list(VAR1 = "value1", VAR2 = "value2")
+      env_lines <- sapply(names(condor_environment), function(name) {
+        # Wrap values in quotes to protect spaces
+        sprintf("%s=\"%s\"", name, condor_environment[[name]])
+      })
+      writeLines(env_lines, env_file)
+    } else if (is.character(condor_environment)) {
+      # Handle string format: "VAR1=value1 VAR2=value2"
+      # Split by whitespace but preserve = within each variable
+      env_pairs <- unlist(strsplit(condor_environment, "\\s+"))
+      # Filter for valid environment variable patterns
+      valid_env <- env_pairs[grepl("^[A-Za-z_][A-Za-z0-9_]*=", env_pairs)]
+      
+      # Wrap each environment variable value in quotes
+      quoted_env <- sapply(valid_env, function(pair) {
+        # Split by first = only to handle values containing =
+        parts <- strsplit(pair, "=", fixed = TRUE)[[1]]
+        if (length(parts) >= 2) {
+          key <- parts[1]
+          # Rejoin remaining parts in case value contains =
+          value <- paste(parts[-1], collapse = "=")
+          sprintf("%s=\"%s\"", key, value)
+        } else {
+          # Return original if no proper key=value structure
+          pair
+        }
+      })
+      
+      writeLines(quoted_env, env_file)
+    }
   }
+  
   
   
   # 3. Create the Condor submit file
@@ -194,6 +226,8 @@ TransferOutputFiles = output_archive.tar.gz
 Output     = condor_job.out
 Error      = condor_job.err
 Log        = condor_job.log
+stream_out = %s
+stream_error = %s
 getenv = True
 %s%s
 Queue
@@ -203,6 +237,8 @@ Queue
                                  clone_script, 
                                  run_script,
                                  env_file,
+                                 stream_out,
+                                 stream_error,
                                  if(nzchar(environment_string)) sprintf("environment = %s\n", environment_string) else "",
                                  if(nzchar(condor_options)) paste0(condor_options, "\n") else ""
   )
@@ -273,4 +309,5 @@ Queue
   
   message("Cleanup completed.")
 }
+
 
