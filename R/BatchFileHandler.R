@@ -86,6 +86,7 @@
 
 
 
+
 BatchFileHandler <- function(
     remote_user,
     remote_host,
@@ -440,9 +441,6 @@ BatchFileHandler <- function(
   
   invisible(res == 0)  # Return TRUE if successful
 }
-
-
-
 
 
 
