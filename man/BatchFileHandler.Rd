@@ -17,7 +17,8 @@ BatchFileHandler(
   archive_name = NULL,
   extract_pattern = NULL,
   extract_folder = NULL,
-  extract_entire = FALSE
+  extract_entire = FALSE,
+  direct_extract = FALSE
 )
 }
 \arguments{

@@ -83,6 +83,9 @@
 #' }
 #'
 #' @export
+
+
+
 BatchFileHandler <- function(
     remote_user,
     remote_host,
@@ -96,7 +99,8 @@ BatchFileHandler <- function(
     archive_name = NULL,
     extract_pattern = NULL,
     extract_folder = NULL,
-    extract_entire = FALSE
+    extract_entire = FALSE,
+    direct_extract = FALSE
 ) {
   # Validate action parameter
   action <- match.arg(action, choices = c("delete", "fetch"))
@@ -151,23 +155,59 @@ BatchFileHandler <- function(
   }
   
   #---------------------------------------------------------------------------
-  # Helper function to extract files from archive
+  # Helper function to extract files from archive (LOCAL - EXTRACT CONTENTS ONLY)
   #---------------------------------------------------------------------------
   extract_from_archive <- function(archive_path, output_dir) {
     # Determine archive type and extraction command
     if (grepl("\\.tar\\.gz$|\\.tgz$", archive_path)) {
       # Handle tar.gz files
       if (extract_entire) {
-        # Extract entire archive
         cmd <- sprintf("tar -xzf %s -C %s", archive_path, output_dir)
         message("  Extracting entire tar.gz archive...")
       } else if (!is.null(extract_folder)) {
-        # Extract specific folder
-        cmd <- sprintf("tar -xzf %s -C %s %s", 
-                       archive_path, output_dir, extract_folder)
-        message(sprintf("  Extracting folder: %s", extract_folder))
+        # Extract folder contents only using temp directory
+        temp_extract_dir <- file.path(tempdir(), "extract_temp")
+        dir.create(temp_extract_dir, recursive = TRUE)
+        
+        # Extract the folder to temp directory
+        cmd1 <- sprintf("tar -xzf %s -C %s %s", 
+                        archive_path, temp_extract_dir, extract_folder)
+        result1 <- system(cmd1, ignore.stderr = TRUE)
+        
+        if (result1 == 0) {
+          # Find the extracted folder and copy its contents
+          extracted_path <- file.path(temp_extract_dir, extract_folder)
+          
+          if (dir.exists(extracted_path)) {
+            # Copy contents to output directory
+            all_files <- list.files(extracted_path, full.names = TRUE, recursive = TRUE)
+            all_dirs_in_target <- list.dirs(extracted_path, full.names = TRUE, recursive = TRUE)
+            
+            # Create directory structure
+            for (dir_path in all_dirs_in_target) {
+              rel_path <- gsub(paste0(extracted_path, "/"), "", dir_path)
+              if (nchar(rel_path) > 0) {
+                dir.create(file.path(output_dir, rel_path), recursive = TRUE, showWarnings = FALSE)
+              }
+            }
+            
+            # Copy files
+            for (file_path in all_files) {
+              rel_path <- gsub(paste0(extracted_path, "/"), "", file_path)
+              file.copy(file_path, file.path(output_dir, rel_path), recursive = TRUE)
+            }
+            
+            message(sprintf("  Extracted contents of folder: %s", extract_folder))
+          }
+          
+          # Clean up temp directory
+          unlink(temp_extract_dir, recursive = TRUE)
+          return(TRUE)
+        } else {
+          unlink(temp_extract_dir, recursive = TRUE)
+          return(FALSE)
+        }
       } else if (!is.null(extract_pattern)) {
-        # Extract specific files matching pattern
         cmd <- sprintf("tar -xzf %s -C %s --wildcards '%s'", 
                        archive_path, output_dir, extract_pattern)
         message(sprintf("  Extracting files matching pattern: %s", extract_pattern))
@@ -178,16 +218,50 @@ BatchFileHandler <- function(
     } else if (grepl("\\.zip$", archive_path)) {
       # Handle zip files
       if (extract_entire) {
-        # Extract entire archive
         cmd <- sprintf("unzip -q %s -d %s", archive_path, output_dir)
         message("  Extracting entire zip archive...")
       } else if (!is.null(extract_folder)) {
-        # Extract specific folder
-        cmd <- sprintf("unzip -q %s '%s/*' -d %s", 
-                       archive_path, extract_folder, output_dir)
-        message(sprintf("  Extracting folder: %s", extract_folder))
+        # For zip, extract to temp and then copy contents
+        temp_extract_dir <- file.path(tempdir(), "extract_temp")
+        dir.create(temp_extract_dir, recursive = TRUE)
+        
+        cmd1 <- sprintf("unzip -q %s '%s/*' -d %s", 
+                        archive_path, extract_folder, temp_extract_dir)
+        result1 <- system(cmd1, ignore.stderr = TRUE)
+        
+        if (result1 == 0) {
+          # Find and copy folder contents
+          extracted_path <- file.path(temp_extract_dir, extract_folder)
+          
+          if (dir.exists(extracted_path)) {
+            # Copy contents to output directory
+            all_files <- list.files(extracted_path, full.names = TRUE, recursive = TRUE)
+            all_dirs_in_target <- list.dirs(extracted_path, full.names = TRUE, recursive = TRUE)
+            
+            # Create directory structure
+            for (dir_path in all_dirs_in_target) {
+              rel_path <- gsub(paste0(extracted_path, "/"), "", dir_path)
+              if (nchar(rel_path) > 0) {
+                dir.create(file.path(output_dir, rel_path), recursive = TRUE, showWarnings = FALSE)
+              }
+            }
+            
+            # Copy files
+            for (file_path in all_files) {
+              rel_path <- gsub(paste0(extracted_path, "/"), "", file_path)
+              file.copy(file_path, file.path(output_dir, rel_path), recursive = TRUE)
+            }
+            
+            message(sprintf("  Extracted contents of folder: %s", extract_folder))
+          }
+          
+          unlink(temp_extract_dir, recursive = TRUE)
+          return(TRUE)
+        } else {
+          unlink(temp_extract_dir, recursive = TRUE)
+          return(FALSE)
+        }
       } else if (!is.null(extract_pattern)) {
-        # Extract specific files matching pattern
         cmd <- sprintf("unzip -q %s '%s' -d %s", 
                        archive_path, extract_pattern, output_dir)
         message(sprintf("  Extracting files matching pattern: %s", extract_pattern))
@@ -200,15 +274,84 @@ BatchFileHandler <- function(
       return(FALSE)
     }
     
-    # Execute extraction command
-    result <- system(cmd, ignore.stderr = TRUE)
-    if (result == 0) {
-      message("  ✔ Archive extracted successfully")
-      return(TRUE)
-    } else {
-      message("  ✗ Archive extraction failed")
+    # Execute extraction command (for non-folder extractions)
+    if (!is.null(extract_pattern) || extract_entire) {
+      result <- system(cmd, ignore.stderr = TRUE)
+      if (result == 0) {
+        message("  ✔ Archive extracted successfully")
+        return(TRUE)
+      } else {
+        message("  ✗ Archive extraction failed")
+        return(FALSE)
+      }
+    }
+    
+    return(TRUE)  # For folder extractions, already handled above
+  }
+  
+  #---------------------------------------------------------------------------
+  # Helper function for direct extraction from remote (EXTRACT CONTENTS ONLY)
+  #---------------------------------------------------------------------------
+  extract_remote_direct <- function(remote_archive_path, output_dir) {
+    # Create output directory if it doesn't exist
+    if (!dir.exists(output_dir)) {
+      dir.create(output_dir, recursive = TRUE)
+    }
+    
+    # Only support tar.gz for direct extraction
+    if (!grepl("\\.tar\\.gz$|\\.tgz$", remote_archive_path)) {
+      message("  Direct extraction only supports tar.gz files")
       return(FALSE)
     }
+    
+    # Build extraction command based on criteria
+    if (extract_entire) {
+      # Extract entire archive to remote temp, then stream back
+      temp_dir <- sprintf("/tmp/extract_%s", basename(tempfile()))
+      cmd <- sprintf("ssh %s@%s 'mkdir -p %s && tar -xzf %s -C %s && tar -czf - -C %s .' | tar -xzf - -C %s", 
+                     remote_user, remote_host, temp_dir, remote_archive_path, temp_dir, temp_dir, output_dir)
+      
+      # Cleanup command
+      cleanup_cmd <- sprintf("ssh %s@%s 'rm -rf %s'", remote_user, remote_host, temp_dir)
+      
+      message("  Extracting entire archive directly from remote...")
+    } else if (!is.null(extract_folder)) {
+      # Extract specific folder contents only (not the folder itself)
+      temp_dir <- sprintf("/tmp/extract_%s", basename(tempfile()))
+      
+      # Use the exact path provided in extract_folder
+      folder_path <- extract_folder
+      
+      # Extract to temp, then tar the contents of the specified folder, not the folder itself
+      cmd <- sprintf("ssh %s@%s 'mkdir -p %s && tar -xzf %s -C %s %s && tar -czf - -C %s/%s .' | tar -xzf - -C %s", 
+                     remote_user, remote_host, temp_dir, remote_archive_path, temp_dir, folder_path, temp_dir, folder_path, output_dir)
+      
+      # Cleanup command
+      cleanup_cmd <- sprintf("ssh %s@%s 'rm -rf %s'", remote_user, remote_host, temp_dir)
+      
+      message(sprintf("  Extracting contents of folder '%s' directly from remote...", extract_folder))
+    } else if (!is.null(extract_pattern)) {
+      # Extract files matching pattern
+      temp_dir <- sprintf("/tmp/extract_%s", basename(tempfile()))
+      cmd <- sprintf("ssh %s@%s 'mkdir -p %s && tar -xzf %s -C %s --wildcards \"%s\" && tar -czf - -C %s .' | tar -xzf - -C %s", 
+                     remote_user, remote_host, temp_dir, remote_archive_path, temp_dir, extract_pattern, temp_dir, output_dir)
+      
+      # Cleanup command
+      cleanup_cmd <- sprintf("ssh %s@%s 'rm -rf %s'", remote_user, remote_host, temp_dir)
+      
+      message(sprintf("  Extracting files matching pattern '%s' directly from remote...", extract_pattern))
+    } else {
+      message("  No extraction criteria specified")
+      return(FALSE)
+    }
+    
+    # Execute command
+    result <- system(cmd, ignore.stderr = TRUE)
+    
+    # Cleanup remote temp directory
+    system(cleanup_cmd, ignore.stderr = TRUE)
+    
+    return(result == 0)
   }
   
   #---------------------------------------------------------------------------
@@ -234,27 +377,41 @@ BatchFileHandler <- function(
     
     # Handle archive extraction
     if (extract_archive && !is.null(archive_name)) {
-      # Fetch and extract from archive
       archive_remote_path <- file.path(folder_name, archive_name)
-      temp_archive <- file.path(fetch_dir, archive_name)
       
-      # Download archive file
-      scp_cmd <- sprintf("scp %s@%s:%s %s",
-                         remote_user, remote_host, archive_remote_path, temp_archive)
-      message(sprintf("  Downloading archive: %s", archive_name))
-      res <- system(scp_cmd, ignore.stderr = TRUE)
-      
-      if (res == 0) {
-        message("  ✔ Archive downloaded successfully")
+      if (direct_extract) {
+        # Use direct extraction
+        message(sprintf("  Using direct extraction for: %s", archive_name))
+        success <- extract_remote_direct(archive_remote_path, fetch_dir)
+        res <- if (success) 0 else 1
         
-        # Extract from archive
-        if (extract_from_archive(temp_archive, fetch_dir)) {
-          # Remove temporary archive file
-          unlink(temp_archive)
-          message("  ✔ Temporary archive file removed")
+        if (success) {
+          message("  ✔ Direct extraction successful")
+        } else {
+          message("  ✗ Direct extraction failed")
         }
       } else {
-        message("  ✗ Archive download failed")
+        # Download then extract
+        temp_archive <- file.path(fetch_dir, archive_name)
+        
+        # Download archive file
+        scp_cmd <- sprintf("scp %s@%s:%s %s",
+                           remote_user, remote_host, archive_remote_path, temp_archive)
+        message(sprintf("  Downloading archive: %s", archive_name))
+        res <- system(scp_cmd, ignore.stderr = TRUE)
+        
+        if (res == 0) {
+          message("  ✔ Archive downloaded successfully")
+          
+          # Extract from archive
+          if (extract_from_archive(temp_archive, fetch_dir)) {
+            # Remove temporary archive file
+            unlink(temp_archive)
+            message("  ✔ Temporary archive file removed")
+          }
+        } else {
+          message("  ✗ Archive download failed")
+        }
       }
       
     } else {
@@ -283,6 +440,9 @@ BatchFileHandler <- function(
   
   invisible(res == 0)  # Return TRUE if successful
 }
+
+
+
 
 
 
