@@ -12,14 +12,19 @@ CondorBox(
   github_username,
   github_org,
   github_repo,
+  stream_error = "FALSE",
   branch = "main",
   docker_image,
   target_folder = NULL,
   condor_cpus = NULL,
   condor_memory = NULL,
+  condor_disk = NULL,
   make_options = "all",
+  rmclone_script = "yes",
   ghcr_login = FALSE,
-  remote_os = "linux"
+  remote_os = "linux",
+  condor_environment = NULL,
+  custom_batch_name = NULL
 )
 }
 \arguments{
