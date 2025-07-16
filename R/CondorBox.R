@@ -28,6 +28,8 @@
 #' @export
 
 
+
+
 CondorBox <- function(
     remote_user,
     remote_host,
@@ -170,11 +172,12 @@ tar -czvf output_archive.tar.gz \"$WORK_DIR\"
     }
   }
   
-  # Set batch name - use custom_batch_name if provided, otherwise use make_options
+  # **MODIFIED: Set batch name logic**
+  # If custom_batch_name is provided, use it; otherwise use $(ClusterId) only
   if (!is.null(custom_batch_name)) {
-    batch_name <- custom_batch_name
+    batch_name_template <- custom_batch_name
   } else {
-    batch_name <- gsub(" ", "_", make_options)
+    batch_name_template <- "$(ClusterId)"  # Just use the job ID number
   }
   
   condor_options <- paste(condor_options, collapse = "\n")
@@ -198,7 +201,7 @@ batch_name = %s
 Queue
 ", 
                                  docker_image, run_script, clone_script, run_script, env_file,
-                                 stream_error, batch_name,
+                                 stream_error, batch_name_template,
                                  if(nzchar(environment_string)) sprintf("environment = %s\n", environment_string) else "",
                                  if(nzchar(condor_options)) paste0(condor_options, "\n") else "")
   
@@ -279,9 +282,16 @@ Queue
     }
   }
   
+  # **MODIFIED: Set actual batch name based on job ID**
+  if (!is.null(custom_batch_name)) {
+    actual_batch_name <- custom_batch_name
+  } else {
+    actual_batch_name <- job_id  # Just use the job ID as batch name
+  }
+  
   # Report job submission results
   if (!is.null(job_id) && job_id != "") {
-    message(sprintf("Job submitted successfully! Job ID: %s, Batch Name: %s", job_id, batch_name))
+    message(sprintf("Job submitted successfully! Job ID: %s, Batch Name: %s", job_id, actual_batch_name))
     
     # 10. Monitor job status and delete clone script when job starts running
     if (rmclone_script == "yes") {
@@ -344,6 +354,7 @@ Queue
   message("Process completed.")
   return(job_id)
 }
+
 
 
 
