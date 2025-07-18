@@ -24,7 +24,10 @@ CondorBox(
   ghcr_login = FALSE,
   remote_os = "linux",
   condor_environment = NULL,
-  custom_batch_name = NULL
+  custom_batch_name = NULL,
+  slot_requirements = NULL,
+  exclude_machines = NULL,
+  exclude_slots = NULL
 )
 }
 \arguments{

@@ -30,6 +30,8 @@
 
 
 
+
+
 CondorBox <- function(
     remote_user,
     remote_host,
@@ -50,7 +52,10 @@ CondorBox <- function(
     ghcr_login = FALSE,
     remote_os = "linux",
     condor_environment = NULL,
-    custom_batch_name = NULL
+    custom_batch_name = NULL,
+    slot_requirements = NULL,  # newly added parameter
+    exclude_machines = NULL,   # exclude specific machines
+    exclude_slots = NULL       # exclude specific slots
 ) {
   
   # Define file names
@@ -182,7 +187,34 @@ tar -czvf output_archive.tar.gz \"$WORK_DIR\"
   
   condor_options <- paste(condor_options, collapse = "\n")
   
-  # 5. Create HTCondor submit file
+  exclusion_requirements <- c()
+  
+  # Exclude specific machines
+  if (!is.null(exclude_machines)) {
+    for (machine in exclude_machines) {
+      exclusion_requirements <- c(exclusion_requirements, sprintf("Machine != \"%s\"", machine))
+    }
+  }
+  
+  # Exclude specific slots
+  if (!is.null(exclude_slots)) {
+    for (slot in exclude_slots) {
+      exclusion_requirements <- c(exclusion_requirements, sprintf("Name != \"%s\"", slot))
+    }
+  }
+  
+  # Custom requirements
+  if (!is.null(slot_requirements)) {
+    exclusion_requirements <- c(exclusion_requirements, slot_requirements)
+  }
+  
+  # Build requirements string - ONLY if we have exclusions
+  requirements_string <- ""
+  if (length(exclusion_requirements) > 0) {
+    requirements_string <- sprintf("Requirements = %s\n", paste(exclusion_requirements, collapse = " && "))
+  }
+  
+  # Create HTCondor submit file (keep original resource handling)
   submit_file_content <- sprintf("
 Universe   = docker
 DockerImage = %s
@@ -197,11 +229,12 @@ Log        = condor_job.log
 stream_error = %s
 getenv = True
 batch_name = %s
-%s%s
+%s%s%s
 Queue
 ", 
                                  docker_image, run_script, clone_script, run_script, env_file,
                                  stream_error, batch_name_template,
+                                 requirements_string,  # Only exclusion requirements
                                  if(nzchar(environment_string)) sprintf("environment = %s\n", environment_string) else "",
                                  if(nzchar(condor_options)) paste0(condor_options, "\n") else "")
   
@@ -354,6 +387,7 @@ Queue
   message("Process completed.")
   return(job_id)
 }
+
 
 
 
